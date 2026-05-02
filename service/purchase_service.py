@@ -5,14 +5,10 @@ from typing import Any, Dict, List, Optional
 from utils.db_utils import get_db_connection
 from utils.response import error, page_response, success
 
-from service.warehouse_service import WarehouseService
 
 
 class PurchaseService:
     """采购订单管理服务"""
-
-    def __init__(self) -> None:
-        self.warehouse_service = WarehouseService()
 
     # ── 订单列表 ──────────────────────────────────────────────
 
@@ -296,18 +292,12 @@ class PurchaseService:
                     if not items:
                         return error("订单没有商品")
 
-                    # 逐个入库
-                    warehouse = WarehouseService()
+                    # 逐个更新商品库存
                     for item in items:
-                        ok = warehouse.add_to_warehouse(
-                            supplier_id,
-                            item["productId"],
-                            item["productName"],
-                            item["quantity"],
-                            float(item["costPrice"] or 0),
+                        cursor.execute(
+                            "UPDATE py_product SET stock = stock + %s WHERE id = %s AND supplierId = %s",
+                            (item["quantity"], item["productId"], supplier_id),
                         )
-                        if not ok:
-                            raise Exception(f"商品 {item['productName']} 入库失败")
 
                     # 更新状态
                     cursor.execute(
@@ -315,7 +305,7 @@ class PurchaseService:
                         (order_id,),
                     )
                     conn.commit()
-                    return success(None, "支付成功，商品已添加到仓库")
+                    return success(None, "支付成功，商品库存已更新")
         except Exception as e:
             print(f"支付采购订单失败: {e}")
             return error(f"支付失败: {str(e)}")

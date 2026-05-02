@@ -186,9 +186,9 @@ const LayoutConfig = {
             roles: ['community_leader', 'supplier']
         },
         {
-            index: 'community-warehouse',
-            title: '仓库管理',
-            path: '/admin/supplier/warehouse.html',
+            index: 'community-products',
+            title: '社区商品',
+            path: '/admin/supplier/products.html',
             icon: 'el-icon-s-management',
             roles: ['community_leader', 'supplier']
         },
@@ -232,7 +232,7 @@ const LayoutConfig = {
         },
         community_leader: {
             '社区经营': ['community-analysis', 'community-sales-forecast', 'community-smart-selection'],
-            '采购仓储': ['community-purchase-orders', 'community-warehouse'],
+            '采购仓储': ['community-purchase-orders', 'community-products'],
             '订单管理': ['community-orders'],
             '服务管理': ['announcements', 'community-after-sale', 'community-complaints'],
             '个人设置': ['profile']

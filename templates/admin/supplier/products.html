@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社区商品管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <!-- Quill.js 富文本编辑器 -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <link rel="stylesheet" href="/static/css/rich-editor.css">
+    <script src="/static/js/components/rich-editor.js"></script>
+    <style>
+        .product-container { padding: 20px; }
+        .product-header { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+        .search-form { margin-bottom: 20px; padding: 20px; background: #f5f7fa; border-radius: 4px; }
+        .product-table { margin-bottom: 20px; }
+        .product-image { width: 60px; height: 60px; object-fit: cover; border-radius: 4px; }
+
+        .image-uploader { border: 1px dashed #d9d9d9; border-radius: 6px; cursor: pointer; position: relative; overflow: hidden; width: 178px; height: 178px; display: flex; align-items: center; justify-content: center; }
+        .image-uploader:hover { border-color: #409EFF; }
+        .image-uploader-icon { font-size: 28px; color: #8c939d; }
+        .uploaded-image { width: 100%; height: 100%; object-fit: cover; }
+        .upload-tip { margin-top: 8px; color: #909399; font-size: 12px; }
+        .gallery-uploader { margin-top: 10px; }
+        .gallery-uploader .el-upload--picture-card { width: 100px; height: 100px; line-height: 100px; }
+        .gallery-uploader .el-upload-list--picture-card .el-upload-list__item { width: 100px; height: 100px; }
+        .gallery-preview { text-align: center; }
+        .product-images { position: relative; display: inline-block; }
+        .gallery-indicator { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
+        .gallery-indicator:hover { background: rgba(0,0,0,0.8); }
+        .discount-badge { background: #f56c6c; color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 10px; margin-left: 4px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :user-info="userInfo" active-menu="community-products">
+            <template #content>
+                <div class="product-container">
+                <div class="product-header">
+                    <h2>社区商品管理</h2>
+                    <el-button type="primary" @click="showAddDialog">
+                        <i class="el-icon-plus"></i> 添加商品
+                    </el-button>
+                </div>
+
+                <!-- 搜索 -->
+                <el-card class="search-form">
+                    <el-form :model="searchForm" inline>
+                        <el-form-item label="商品名称">
+                            <el-input v-model="searchForm.name" placeholder="请输入商品名称" clearable></el-input>
+                        </el-form-item>
+                        <el-form-item label="分类">
+                            <el-cascader v-model="searchForm.categoryId" :options="categoryTree"
+                                :props="cascaderProps" placeholder="请选择分类" clearable style="width:100%">
+                            </el-cascader>
+                        </el-form-item>
+                        <el-form-item label="状态">
+                            <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+                                <el-option label="上架" :value="1"></el-option>
+                                <el-option label="下架" :value="0"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="searchProducts">搜索</el-button>
+                            <el-button @click="resetSearch">重置</el-button>
+                        </el-form-item>
+                    </el-form>
+                </el-card>
+
+                <!-- 商品列表 -->
+                <el-card>
+                    <div style="margin-bottom:15px" v-if="selectedProducts.length > 0">
+                        <el-button type="danger" @click="batchDelete">
+                            <i class="el-icon-delete"></i> 批量删除 ({{ selectedProducts.length }})
+                        </el-button>
+                    </div>
+
+                    <el-table :data="products" v-loading="loading" @selection-change="handleSelectionChange">
+                        <el-table-column type="selection" width="55"></el-table-column>
+                        <el-table-column label="商品图片" width="120">
+                            <template slot-scope="scope">
+                                <div class="product-images">
+                                    <img :src="scope.row.mainImage || '/static/image/no-image.png'"
+                                        :alt="scope.row.name" class="product-image">
+                                    <div v-if="scope.row.galleryImages" class="gallery-indicator"
+                                        @click="previewProductGallery(scope.row)">
+                                        <i class="el-icon-picture"></i>
+                                        <span>{{ getGalleryCount(scope.row.galleryImages) }}</span>
+                                    </div>
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="name" label="商品名称" min-width="180"></el-table-column>
+                        <el-table-column prop="price" label="售价" width="100">
+                            <template slot-scope="scope">
+                                <span style="color:#f56c6c;font-weight:bold">¥{{ scope.row.price }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="costPrice" label="进价" width="100">
+                            <template slot-scope="scope">
+                                <span style="color:#64748b">¥{{ scope.row.costPrice }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="stock" label="库存" width="70"></el-table-column>
+                        <el-table-column prop="sales" label="销量" width="70"></el-table-column>
+                        <el-table-column label="折扣" width="80" align="center">
+                            <template slot-scope="scope">
+                                <span v-if="scope.row.discountRate">
+                                    <el-tag size="mini" type="danger">{{ Math.round(scope.row.discountRate * 100) }}%</el-tag>
+                                </span>
+                                <span v-else style="color:#c0c4cc">-</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="status" label="状态" width="70">
+                            <template slot-scope="scope">
+                                <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
+                                    {{ scope.row.status === 1 ? '上架' : '下架' }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="createTime" label="创建时间" width="155">
+                            <template slot-scope="scope">{{ formatDate(scope.row.createTime) }}</template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="250" fixed="right">
+                            <template slot-scope="scope">
+                                <el-button type="text" @click="editProduct(scope.row)">编辑</el-button>
+                                <el-button type="text" @click="showDiscountDialog(scope.row)"
+                                    style="color:#e6a23c">打折</el-button>
+                                <el-button type="text"
+                                    @click="toggleStatus(scope.row)"
+                                    :style="{ color: scope.row.status === 1 ? '#f56c6c' : '#67c23a' }">
+                                    {{ scope.row.status === 1 ? '下架' : '上架' }}
+                                </el-button>
+                                <el-button type="text" @click="deleteProduct(scope.row)" style="color:#f56c6c">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <el-pagination v-if="total > 0"
+                        @size-change="handleSizeChange"
+                        @current-change="handleCurrentChange"
+                        :current-page="currentPage"
+                        :page-sizes="[10, 20, 50, 100]"
+                        :page-size="pageSize"
+                        layout="total, sizes, prev, pager, next, jumper"
+                        :total="total" style="margin-top:20px;text-align:center">
+                    </el-pagination>
+                </el-card>
+
+                <!-- 添加/编辑商品对话框 -->
+                <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="60%">
+                    <el-form :model="productForm" :rules="productRules" ref="productForm" label-width="100px">
+                        <el-row :gutter="20">
+                            <el-col :span="12">
+                                <el-form-item label="商品名称" prop="name">
+                                    <el-input v-model="productForm.name" placeholder="请输入商品名称"></el-input>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-form-item label="分类" prop="categoryId">
+                                    <el-cascader v-model="productForm.categoryId" :options="categoryTree"
+                                        :props="cascaderProps" placeholder="请选择分类" style="width:100%">
+                                    </el-cascader>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+                        <el-row :gutter="20">
+                            <el-col :span="8">
+                                <el-form-item label="售价" prop="price">
+                                    <el-input-number v-model="productForm.price" :min="0" :precision="2" style="width:100%"></el-input-number>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="8">
+                                <el-form-item label="进价" prop="costPrice">
+                                    <el-input-number v-model="productForm.costPrice" :min="0" :precision="2" style="width:100%"></el-input-number>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="8">
+                                <el-form-item label="原价" prop="originalPrice">
+                                    <el-input-number v-model="productForm.originalPrice" :min="0" :precision="2" style="width:100%"></el-input-number>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+                        <el-row :gutter="20">
+                            <el-col :span="12">
+                                <el-form-item label="库存" prop="stock">
+                                    <el-input-number v-model="productForm.stock" :min="0" style="width:100%"></el-input-number>
+                                </el-form-item>
+                            </el-col>
+                            <el-col :span="12">
+                                <el-form-item label="状态" prop="status">
+                                    <el-radio-group v-model="productForm.status">
+                                        <el-radio :label="1">上架</el-radio>
+                                        <el-radio :label="0">下架</el-radio>
+                                    </el-radio-group>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+                        <el-form-item label="商品描述" prop="description">
+                            <div id="description-editor" style="height:300px"></div>
+                        </el-form-item>
+                        <el-form-item label="主图" prop="mainImage">
+                            <el-upload class="image-uploader" action="/open/upload" :show-file-list="false"
+                                :on-success="handleMainImageSuccess" :before-upload="beforeImageUpload" accept="image/*">
+                                <img v-if="productForm.mainImage" :src="productForm.mainImage" class="uploaded-image">
+                                <i v-else class="el-icon-plus image-uploader-icon"></i>
+                            </el-upload>
+                            <div class="upload-tip">支持 jpg、png 格式，大小不超过 5MB</div>
+                        </el-form-item>
+                        <el-form-item label="轮播图" prop="galleryImages">
+                            <div class="gallery-uploader">
+                                <el-upload action="/open/upload" :file-list="galleryFileList"
+                                    :on-success="handleGallerySuccess" :on-remove="handleGalleryRemove"
+                                    :before-upload="beforeImageUpload" :on-preview="handleGalleryPreview"
+                                    :auto-upload="true" list-type="picture-card" accept="image/*" :limit="9">
+                                    <i class="el-icon-plus"></i>
+                                </el-upload>
+                                <div class="upload-tip">最多上传9张图片，支持 jpg、png 格式，每张图片大小不超过 5MB</div>
+                            </div>
+                        </el-form-item>
+                    </el-form>
+                    <div slot="footer" class="dialog-footer">
+                        <el-button @click="dialogVisible = false">取消</el-button>
+                        <el-button type="primary" @click="saveProduct">确定</el-button>
+                    </div>
+                </el-dialog>
+
+                <!-- 设置折扣对话框 -->
+                <el-dialog title="设置商品折扣" :visible.sync="discountDialogVisible" width="420px">
+                    <div v-if="discountTarget">
+                        <div style="margin-bottom:16px">
+                            <span style="font-weight:600">{{ discountTarget.name }}</span>
+                            <span style="color:#64748b;margin-left:8px">当前售价 ¥{{ discountTarget.price }}</span>
+                        </div>
+                        <el-form label-width="80px">
+                            <el-form-item label="折扣率">
+                                <el-slider v-model="discountRate"
+                                    :min="50" :max="100" :step="5"
+                                    show-input style="width:280px">
+                                </el-slider>
+                            </el-form-item>
+                            <el-form-item label="折后价">
+                                <span style="font-size:18px;font-weight:700;color:#f56c6c">
+                                    ¥{{ (discountTarget.price * discountRate / 100).toFixed(2) }}
+                                </span>
+                                <el-tag size="mini" type="danger" style="margin-left:8px">
+                                    {{ discountRate }}%
+                                </el-tag>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                    <div slot="footer">
+                        <el-button v-if="discountTarget && discountTarget._hasDiscount"
+                            type="danger" plain size="small" @click="clearDiscount" :loading="discountLoading">
+                            清除折扣
+                        </el-button>
+                        <el-button type="primary" @click="applyDiscount" :loading="discountLoading">
+                            确定
+                        </el-button>
+                    </div>
+                </el-dialog>
+
+                <!-- 轮播图预览对话框 -->
+                <el-dialog title="轮播图预览" :visible.sync="galleryPreviewVisible" width="60%">
+                    <div class="gallery-preview">
+                        <el-carousel :autoplay="false" height="400px" indicator-position="outside">
+                            <el-carousel-item v-for="(image, index) in galleryPreviewImages" :key="index">
+                                <img :src="image.url" :alt="image.name" style="width:100%;height:100%;object-fit:contain">
+                            </el-carousel-item>
+                        </el-carousel>
+                    </div>
+                </el-dialog>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+    new Vue({
+        el: '#app',
+        data() {
+            return {
+                userInfo: {},
+                products: [],
+                categories: [],
+                categoryTree: [],
+                loading: false,
+                currentPage: 1,
+                pageSize: 10,
+                total: 0,
+                selectedProducts: [],
+                searchForm: { name: '', categoryId: [], status: '' },
+                cascaderProps: { value: 'id', label: 'name', children: 'children', checkStrictly: true },
+                dialogVisible: false,
+                dialogTitle: '添加商品',
+                productForm: {
+                    id: null, name: '', categoryId: [], price: 0, costPrice: 0,
+                    originalPrice: 0, stock: 0, description: '', mainImage: '',
+                    galleryImages: '', status: 1
+                },
+                galleryFileList: [],
+                galleryPreviewVisible: false,
+                galleryPreviewImages: [],
+                richEditor: null,
+                productRules: {
+                    name: [{ required: true, message: '请输入商品名称', trigger: 'blur' }],
+                    categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
+                    price: [{ required: true, message: '请输入价格', trigger: 'blur' }]
+                },
+                // 折扣相关
+                discountDialogVisible: false,
+                discountTarget: null,
+                discountRate: 100,
+                discountLoading: false,
+            }
+        },
+        mounted() {
+            this.checkAuth();
+            this.loadCategories();
+            this.loadProducts();
+        },
+        methods: {
+            checkAuth() {
+                const userInfo = localStorage.getItem('userInfo');
+                if (userInfo) { this.userInfo = JSON.parse(userInfo); }
+                else {
+                    this.$message.warning('请先登录');
+                    window.location.href = '/login';
+                }
+            },
+
+            async loadCategories() {
+                try {
+                    const res = await fetch('/api/mall/category/tree');
+                    const result = await res.json();
+                    if (result.code === 200) {
+                        this.categoryTree = result.data;
+                        this.categories = this.flattenCategories(result.data);
+                    }
+                } catch (e) { console.error('加载分类失败:', e); }
+            },
+
+            flattenCategories(categories, level) {
+                level = level || 0;
+                let result = [];
+                categories.forEach(function (cat) {
+                    var item = Object.assign({}, cat, { level: level, displayName: '　'.repeat(level) + cat.name });
+                    result.push(item);
+                    if (cat.children && cat.children.length > 0) {
+                        result = result.concat(this.flattenCategories(cat.children, level + 1));
+                    }
+                }, this);
+                return result;
+            },
+
+            async loadProducts() {
+                this.loading = true;
+                try {
+                    var searchParams = Object.assign({}, this.searchForm);
+                    if (Array.isArray(searchParams.categoryId) && searchParams.categoryId.length > 0) {
+                        searchParams.categoryId = searchParams.categoryId[searchParams.categoryId.length - 1];
+                    } else if (Array.isArray(searchParams.categoryId)) {
+                        searchParams.categoryId = '';
+                    }
+
+                    var params = new URLSearchParams({
+                        pageNum: this.currentPage,
+                        pageSize: this.pageSize,
+                        keyword: searchParams.name || '',
+                        categoryId: searchParams.categoryId || '',
+                        status: searchParams.status === '' ? '' : searchParams.status
+                    });
+
+                    const response = await fetch('/api/supplier/products?' + params);
+                    const result = await response.json();
+
+                    if (result.code === 200) {
+                        // 加载每个商品的折扣信息
+                        var rows = result.data.rows || [];
+                        for (var i = 0; i < rows.length; i++) {
+                            rows[i].discountRate = null;
+                        }
+                        this.products = rows;
+                        this.total = result.data.total;
+                        // 批量查询折扣信息
+                        this.loadDiscounts();
+                    } else {
+                        this.$message.error(result.message);
+                    }
+                } catch (e) {
+                    console.error('加载商品列表失败:', e);
+                    this.$message.error('加载商品列表失败');
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            async loadDiscounts() {
+                try {
+                    const res = await fetch('/api/smart-selection/slow-moving?days=999', {
+                        credentials: 'same-origin'
+                    });
+                    const result = await res.json();
+                    if (result.code === 200 && result.data && result.data.products) {
+                        var discountMap = {};
+                        result.data.products.forEach(function (p) {
+                            if (p.discountRate) {
+                                discountMap[p.productId] = p.discountRate;
+                            }
+                        });
+                        this.products.forEach(function (p) {
+                            if (discountMap[p.id]) {
+                                p.discountRate = discountMap[p.id];
+                            }
+                        });
+                        // 强制刷新
+                        this.products = JSON.parse(JSON.stringify(this.products));
+                    }
+                } catch (e) { /* ignore */ }
+            },
+
+            searchProducts() { this.currentPage = 1; this.loadProducts(); },
+
+            resetSearch() {
+                this.searchForm = { name: '', categoryId: [], status: '' };
+                this.currentPage = 1;
+                this.loadProducts();
+            },
+
+            showAddDialog() {
+                this.dialogTitle = '添加商品';
+                this.productForm = {
+                    id: null, name: '', categoryId: [], price: 0, costPrice: 0,
+                    originalPrice: 0, stock: 0, description: '', mainImage: '',
+                    galleryImages: '', status: 1
+                };
+                this.galleryFileList = [];
+                this.dialogVisible = true;
+                this.$nextTick(function () { this.initRichEditor(); }.bind(this));
+            },
+
+            async editProduct(product) {
+                this.dialogTitle = '编辑商品';
+                try {
+                    const response = await fetch('/api/mall/product/' + product.id);
+                    const result = await response.json();
+                    if (result.code !== 200 || !result.data) {
+                        this.$message.error(result.message || '获取商品详情失败');
+                        return;
+                    }
+                    var detail = result.data;
+                    this.productForm = Object.assign({}, detail);
+                    this.productForm.description = detail.description || '';
+                    this.productForm.categoryId = this.getCategoryPath(detail.categoryId);
+
+                    this.galleryFileList = [];
+                    if (detail.galleryImages) {
+                        try {
+                            var images = JSON.parse(detail.galleryImages);
+                            if (Array.isArray(images)) {
+                                this.galleryFileList = images.map(function (url, idx) {
+                                    return { name: '轮播图' + (idx + 1), url: url, uid: Date.now() + idx };
+                                });
+                            }
+                        } catch (e) { console.error('解析轮播图失败:', e); }
+                    }
+
+                    this.dialogVisible = true;
+                    this.$nextTick(function () { this.initRichEditor(); }.bind(this));
+                } catch (e) {
+                    this.$message.error('获取商品详情失败');
+                }
+            },
+
+            getCategoryPath(categoryId) {
+                if (!categoryId) return [];
+                var findPath = function (categories, targetId, path) {
+                    path = path || [];
+                    for (var i = 0; i < categories.length; i++) {
+                        var cat = categories[i];
+                        var currentPath = path.concat([cat.id]);
+                        if (cat.id === targetId) return currentPath;
+                        if (cat.children && cat.children.length > 0) {
+                            var res = findPath(cat.children, targetId, currentPath);
+                            if (res) return res;
+                        }
+                    }
+                    return null;
+                };
+                return findPath(this.categoryTree, categoryId) || [categoryId];
+            },
+
+            initRichEditor() {
+                if (this.richEditor) { this.richEditor.destroy(); }
+                this.richEditor = new RichEditor({
+                    container: '#description-editor',
+                    placeholder: '请输入商品详细描述...',
+                    height: 300,
+                    value: this.productForm.description,
+                    onChange: function (content) {
+                        this.productForm.description = content;
+                    }.bind(this)
+                });
+            },
+
+            beforeImageUpload(file) {
+                var isImage = file.type.startsWith('image/');
+                var isLt5M = file.size / 1024 / 1024 < 5;
+                if (!isImage) { this.$message.error('只能上传图片文件!'); return false; }
+                if (!isLt5M) { this.$message.error('图片大小不能超过 5MB!'); return false; }
+                return true;
+            },
+
+            handleMainImageSuccess(response) {
+                if (response.code === 200) {
+                    this.productForm.mainImage = response.data.url;
+                    this.$message.success('主图上传成功');
+                } else { this.$message.error(response.message || '主图上传失败'); }
+            },
+
+            handleGallerySuccess(response, file) {
+                if (response.code === 200) {
+                    this.$message.success('轮播图上传成功');
+                    var idx = this.galleryFileList.findIndex(function (f) { return f.uid === file.uid; });
+                    if (idx !== -1) {
+                        this.$set(this.galleryFileList, idx, Object.assign({}, this.galleryFileList[idx], { url: response.data.url, status: 'success' }));
+                    } else {
+                        this.galleryFileList.push({ name: file.name, url: response.data.url, status: 'success' });
+                    }
+                    this.updateGalleryImages();
+                } else { this.$message.error(response.message || '轮播图上传失败'); }
+            },
+
+            handleGalleryRemove(file, fileList) { this.galleryFileList = fileList; this.updateGalleryImages(); },
+
+            handleGalleryPreview() {
+                this.galleryPreviewImages = this.galleryFileList.map(function (item) {
+                    return { name: item.name, url: item.url };
+                });
+                this.galleryPreviewVisible = true;
+            },
+
+            updateGalleryImages() {
+                var urls = this.galleryFileList.map(function (f) { return f.url; }).filter(function (u) { return u; });
+                this.productForm.galleryImages = JSON.stringify(urls);
+            },
+
+            async saveProduct() {
+                try {
+                    await this.$refs.productForm.validate();
+                    if (this.richEditor) { this.productForm.description = this.richEditor.getContent(); }
+                    this.updateGalleryImages();
+
+                    var formData = Object.assign({}, this.productForm);
+                    if (Array.isArray(formData.categoryId) && formData.categoryId.length > 0) {
+                        formData.categoryId = formData.categoryId[formData.categoryId.length - 1];
+                    }
+
+                    var url = this.productForm.id ? '/api/mall/product/' + this.productForm.id : '/api/mall/product/';
+                    var method = this.productForm.id ? 'PUT' : 'POST';
+
+                    const response = await fetch(url, {
+                        method: method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(formData)
+                    });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success(result.message);
+                        this.dialogVisible = false;
+                        this.loadProducts();
+                    } else { this.$message.error(result.message); }
+                } catch (e) {
+                    if (e !== 'cancel') {
+                        console.error('保存商品失败:', e);
+                        this.$message.error('保存商品失败');
+                    }
+                }
+            },
+
+            async toggleStatus(product) {
+                try {
+                    var newStatus = product.status === 1 ? 0 : 1;
+                    const response = await fetch('/api/mall/product/' + product.id + '/status', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ status: newStatus })
+                    });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success(result.message);
+                        this.loadProducts();
+                    } else { this.$message.error(result.message); }
+                } catch (e) { console.error('切换状态失败:', e); this.$message.error('切换状态失败'); }
+            },
+
+            async deleteProduct(product) {
+                try {
+                    await this.$confirm('确定要删除这个商品吗？', '提示', {
+                        confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+                    });
+                    const response = await fetch('/api/mall/product/' + product.id, { method: 'DELETE' });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success(result.message);
+                        this.loadProducts();
+                    } else { this.$message.error(result.message); }
+                } catch (e) { if (e !== 'cancel') { console.error('删除商品失败:', e); this.$message.error('删除商品失败'); } }
+            },
+
+            handleSelectionChange(selection) { this.selectedProducts = selection; },
+
+            async batchDelete() {
+                if (this.selectedProducts.length === 0) { this.$message.warning('请选择要删除的商品'); return; }
+                try {
+                    await this.$confirm('确定要删除选中的 ' + this.selectedProducts.length + ' 个商品吗？', '提示', {
+                        confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+                    });
+                    var ids = this.selectedProducts.map(function (item) { return item.id; });
+                    const response = await fetch('/api/mall/product/batch', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: ids })
+                    });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success(result.message);
+                        this.loadProducts();
+                    } else { this.$message.error(result.message); }
+                } catch (e) { if (e !== 'cancel') { console.error('批量删除失败:', e); this.$message.error('批量删除失败'); } }
+            },
+
+            handleSizeChange(val) { this.pageSize = val; this.currentPage = 1; this.loadProducts(); },
+
+            handleCurrentChange(val) { this.currentPage = val; this.loadProducts(); },
+
+            formatDate(dateStr) {
+                if (!dateStr) return '';
+                var d = new Date(dateStr);
+                return d.toLocaleString('zh-CN');
+            },
+
+            getGalleryCount(galleryImages) {
+                if (!galleryImages) return 0;
+                try { var imgs = JSON.parse(galleryImages); return Array.isArray(imgs) ? imgs.length : 0; } catch (e) { return 0; }
+            },
+
+            previewProductGallery(product) {
+                if (!product.galleryImages) { this.$message.warning('该商品暂无轮播图'); return; }
+                try {
+                    var imgs = JSON.parse(product.galleryImages);
+                    if (Array.isArray(imgs) && imgs.length > 0) {
+                        this.galleryPreviewImages = imgs.map(function (url, i) {
+                            return { name: '轮播图' + (i + 1), url: url };
+                        });
+                        this.galleryPreviewVisible = true;
+                    } else { this.$message.warning('该商品暂无轮播图'); }
+                } catch (e) { this.$message.error('轮播图数据格式错误'); }
+            },
+
+            // ---- 折扣操作 ----
+            showDiscountDialog(product) {
+                this.discountTarget = Object.assign({}, product);
+                this.discountRate = product.discountRate ? Math.round(product.discountRate * 100) : 100;
+                this.discountTarget._hasDiscount = !!product.discountRate;
+                this.discountDialogVisible = true;
+            },
+
+            async applyDiscount() {
+                if (!this.discountTarget) return;
+                this.discountLoading = true;
+                try {
+                    var rate = this.discountRate / 100;
+                    const response = await fetch('/api/smart-selection/slow-moving/discount', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ productId: this.discountTarget.id, discountRate: rate })
+                    });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success('折扣已设置');
+                        this.discountDialogVisible = false;
+                        this.loadProducts();
+                    } else {
+                        this.$message.error(result.message);
+                    }
+                } catch (e) {
+                    this.$message.error('设置折扣失败');
+                } finally {
+                    this.discountLoading = false;
+                }
+            },
+
+            async clearDiscount() {
+                if (!this.discountTarget) return;
+                this.discountLoading = true;
+                try {
+                    const response = await fetch('/api/smart-selection/slow-moving/discount?productId=' + this.discountTarget.id, {
+                        method: 'DELETE'
+                    });
+                    const result = await response.json();
+                    if (result.code === 200) {
+                        this.$message.success('折扣已清除');
+                        this.discountDialogVisible = false;
+                        this.loadProducts();
+                    } else {
+                        this.$message.error(result.message);
+                    }
+                } catch (e) {
+                    this.$message.error('清除折扣失败');
+                } finally {
+                    this.discountLoading = false;
+                }
+            },
+        }
+    });
+    </script>
+</body>
+</html>
