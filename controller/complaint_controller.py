@@ -3,6 +3,7 @@
 """
 from flask import Blueprint, request, session, jsonify
 from service.complaint_service import ComplaintService
+from utils.db_utils import get_db_connection
 from utils.response import error
 
 complaint_bp = Blueprint('complaint', __name__)
@@ -104,14 +105,32 @@ def front_delete():
 
 
 # ----------------------------------------------------------------
-# 后台管理接口
+# 后台管理接口（系统管理员、平台运营者、社区团长可用）
 # ----------------------------------------------------------------
+
+def _require_admin():
+    """检查是否有后台管理权限"""
+    role = session.get('role')
+    if role not in ('system_admin', 'platform_operator', 'community_leader'):
+        return False
+    return True
+
+
+def _require_delete_permission():
+    """删除权限：仅系统管理员和平台运营者，团长不可删除"""
+    role = session.get('role')
+    if role == 'community_leader':
+        return False
+    return True
+
 
 @complaint_bp.route('/admin/list', methods=['GET'])
 def admin_list():
-    """后台：投诉列表（分页+筛选）"""
+    """后台投诉列表"""
     if 'user_id' not in session:
         return _j(error('请先登录', 401))
+    if not _require_admin():
+        return _j(error('无权限访问'))
     page = int(request.args.get('pageNum', 1))
     limit = int(request.args.get('pageSize', 10))
     status = request.args.get('status', '').strip()
@@ -120,55 +139,50 @@ def admin_list():
     return _j(ComplaintService.admin_list(page, limit, status, complaint_type, keyword))
 
 
-@complaint_bp.route('/admin/detail', methods=['GET'])
-def admin_detail():
-    """后台：投诉详情"""
-    if 'user_id' not in session:
-        return _j(error('请先登录', 401))
-    complaint_id = request.args.get('id')
-    if not complaint_id:
-        return _j(error('缺少投诉ID'))
-    return _j(ComplaintService.admin_detail(int(complaint_id)))
-
-
 @complaint_bp.route('/admin/reply', methods=['POST'])
 def admin_reply():
-    """后台：回复投诉并更新状态"""
+    """后台回复投诉"""
     if 'user_id' not in session:
         return _j(error('请先登录', 401))
+    if not _require_admin():
+        return _j(error('无权限访问'))
     data = request.get_json() or {}
     complaint_id = data.get('id')
     reply_content = data.get('replyContent', '').strip()
-    new_status = data.get('status', 'processing').strip()
+    new_status = data.get('status', '').strip()
     if not complaint_id:
         return _j(error('缺少投诉ID'))
     if not reply_content:
         return _j(error('回复内容不能为空'))
+    if not new_status:
+        return _j(error('请选择处理状态'))
+
+    # 已关闭的投诉仅平台运营者可再次处理
+    if session.get('role') == 'community_leader':
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT status FROM py_complaint WHERE id=%s", [complaint_id])
+                row = cur.fetchone()
+        if row and row['status'] == 'closed':
+            return _j(error('已关闭的投诉无法再次处理'))
+
     return _j(ComplaintService.admin_reply(
         int(complaint_id), session['user_id'], reply_content, new_status
     ))
 
 
-@complaint_bp.route('/admin/update-status', methods=['POST'])
-def admin_update_status():
-    """后台：仅更新投诉状态"""
-    if 'user_id' not in session:
-        return _j(error('请先登录', 401))
-    data = request.get_json() or {}
-    complaint_id = data.get('id')
-    new_status = data.get('status', '').strip()
-    if not complaint_id or not new_status:
-        return _j(error('缺少必要参数'))
-    return _j(ComplaintService.admin_update_status(int(complaint_id), new_status))
-
-
 @complaint_bp.route('/admin/delete', methods=['DELETE'])
 def admin_delete():
-    """后台：删除投诉记录"""
+    """后台删除投诉"""
     if 'user_id' not in session:
         return _j(error('请先登录', 401))
+    if not _require_admin():
+        return _j(error('无权限访问'))
+    if not _require_delete_permission():
+        return _j(error('团长无权删除投诉'))
     complaint_id = request.args.get('id')
     if not complaint_id:
         return _j(error('缺少投诉ID'))
     return _j(ComplaintService.admin_delete(int(complaint_id)))
+
 

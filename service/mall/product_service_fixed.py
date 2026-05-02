@@ -15,6 +15,17 @@ class ProductService(BaseProductService):
             return None
         if user_info.get('role') == 'community_leader':
             return user_info.get('id')
+        if user_info.get('role') == 'user':
+            user_id = user_info.get('id')
+            if not user_id:
+                return None
+            from utils.db_utils import execute_query
+            leaders = execute_query("""
+                SELECT cl.id FROM py_user u
+                JOIN py_user cl ON u.supplierCode = cl.supplierCode
+                WHERE u.id = %s AND u.role = 'user' AND cl.role = 'community_leader'
+            """, (user_id,))
+            return leaders[0]['id'] if leaders else None
         return None
 
     def get_products(
@@ -35,6 +46,28 @@ class ProductService(BaseProductService):
         result = self.product_model.get_products(category_id, status, page, limit, keyword, sort_type, supplier_id)
         from utils.response import page_response
         return page_response(result['rows'], result['total'], result['page'], result['limit'])
+
+    def get_hot_products(self, limit: int = 10, user_info: Optional[Dict] = None) -> Dict:
+        supplier_id = self._get_supplier_scope_id(user_info)
+        return super().get_hot_products(limit) \
+            if supplier_id is None else self._get_hot_scoped(limit, supplier_id)
+
+    def _get_hot_scoped(self, limit: int, supplier_id: int) -> Dict:
+        result = self.product_model.get_products(status=1, limit=limit, supplier_id=supplier_id)
+        hot_products = [p for p in result['rows'] if p.get('isHot') == 1]
+        from utils.response import success
+        return success(hot_products)
+
+    def get_new_products(self, limit: int = 10, user_info: Optional[Dict] = None) -> Dict:
+        supplier_id = self._get_supplier_scope_id(user_info)
+        return super().get_new_products(limit) \
+            if supplier_id is None else self._get_new_scoped(limit, supplier_id)
+
+    def _get_new_scoped(self, limit: int, supplier_id: int) -> Dict:
+        result = self.product_model.get_products(status=1, limit=limit, supplier_id=supplier_id)
+        new_products = [p for p in result['rows'] if p.get('isNew') == 1]
+        from utils.response import success
+        return success(new_products)
 
     def create_product(self, product_data: Dict, user_info: Optional[Dict] = None) -> Dict:
         supplier_id = self._get_supplier_scope_id(user_info)

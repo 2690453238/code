@@ -19,11 +19,25 @@ def get_user_list():
         keyword = request.args.get('keyword', '')
         role = request.args.get('role', '')
         status = request.args.get('status', '')
-        users, total = user_service.get_user_list(page, limit, keyword, role, status)
+        current_user = get_current_user()
+        exclude_role = 'system_admin' if current_user and current_user['role'] == 'system_admin' else None
+        users, total = user_service.get_user_list(page, limit, keyword, role, status, exclude_role)
         return jsonify(page_response(users, total, page, limit))
     except Exception as e:
         logger.error(f"获取用户列表异常: {e}")
         return jsonify(error("获取用户列表失败"))
+
+
+@user_bp.route('/community-options', methods=['GET'])
+@admin_required
+def get_community_options():
+    """获取社区选项列表"""
+    try:
+        communities = user_service.get_community_options()
+        return jsonify(success(communities, "获取社区选项成功"))
+    except Exception as e:
+        logger.error(f"获取社区选项异常: {e}")
+        return jsonify(error("获取社区选项失败"))
 
 
 @user_bp.route('/<int:user_id>', methods=['GET'])

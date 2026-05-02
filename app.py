@@ -34,6 +34,8 @@ from controller.admin_controller import admin_bp
 from controller.analytics_controller import analytics_bp
 from controller.complaint_controller import complaint_bp
 from controller.smart_selection_controller import smart_selection_bp
+from controller.warehouse_controller import warehouse_bp
+from controller.purchase_controller import purchase_bp
 
 app.register_blueprint(auth_bp, url_prefix='/api/auth')
 app.register_blueprint(user_bp, url_prefix='/api/user')
@@ -56,6 +58,8 @@ app.register_blueprint(admin_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(complaint_bp, url_prefix='/api/complaint')
 app.register_blueprint(smart_selection_bp)
+app.register_blueprint(warehouse_bp)
+app.register_blueprint(purchase_bp)
 
 # 页面路由分发
 @app.route('/')

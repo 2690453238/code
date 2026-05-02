@@ -12,7 +12,7 @@ class UserService:
 
     VALID_ROLES = {'system_admin', 'platform_operator', 'community_leader', 'user'}
 
-    def get_user_list(self, page=1, limit=10, keyword='', role='', status=''):
+    def get_user_list(self, page=1, limit=10, keyword='', role='', status='', exclude_role=None):
         """获取用户列表"""
         try:
             where_conditions = []
@@ -31,6 +31,10 @@ class UserService:
                 where_conditions.append("status = %s")
                 params.append(status)
 
+            if exclude_role:
+                where_conditions.append("role != %s")
+                params.append(exclude_role)
+
             where_clause = ""
             if where_conditions:
                 where_clause = "WHERE " + " AND ".join(where_conditions)
@@ -44,10 +48,15 @@ class UserService:
                 SELECT id, username, nickname, avatar, sex, age, phone, email,
                        birthday, card, address, education, profession, company,
                        content, remarks, role, status, last_login_time,
-                       last_login_ip, createtime, updatetime
+                       last_login_ip, createtime, updatetime,
+                       supplierCode, supplierName
                 FROM py_user
                 {where_clause}
-                ORDER BY createtime DESC
+                ORDER BY FIELD(role, 'platform_operator', 'community_leader', 'user'),
+                         supplierCode IS NULL,
+                         supplierCode,
+                         FIELD(role, 'community_leader', 'user'),
+                         createtime DESC
                 LIMIT %s OFFSET %s
             """
             list_params = params + [limit, offset]
@@ -68,7 +77,8 @@ class UserService:
                 SELECT id, username, nickname, avatar, sex, age, phone, email,
                        birthday, card, address, education, profession, company,
                        content, remarks, role, status, last_login_time,
-                       last_login_ip, createtime, updatetime
+                       last_login_ip, createtime, updatetime,
+                       supplierCode, supplierName
                 FROM py_user
                 WHERE id = %s
             """
@@ -91,7 +101,8 @@ class UserService:
             allowed_fields = [
                 'nickname', 'avatar', 'sex', 'age', 'phone', 'email',
                 'birthday', 'address', 'education', 'profession',
-                'company', 'content', 'remarks', 'role', 'status'
+                'company', 'content', 'remarks', 'role', 'status',
+                'supplierCode', 'supplierName'
             ]
 
             for field in allowed_fields:
@@ -203,8 +214,9 @@ class UserService:
                 INSERT INTO py_user
                 (username, password, nickname, email, phone, sex, age, birthday,
                  address, education, profession, company, content, remarks,
-                 role, status, createtime, updatetime)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                 role, status, createtime, updatetime,
+                 supplierCode, supplierName)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             execute_insert(insert_sql, (
                 data['username'],
@@ -224,12 +236,28 @@ class UserService:
                 role,
                 data.get('status', 'active'),
                 current_time,
-                current_time
+                current_time,
+                data.get('supplierCode'),
+                data.get('supplierName')
             ))
             return True
         except Exception as e:
             logger.error(f"添加用户异常: {e}")
             return False
+
+    def get_community_options(self):
+        """获取所有社区选项（用于下拉选择）"""
+        try:
+            sql = """
+                SELECT DISTINCT supplierCode, supplierName
+                FROM py_user
+                WHERE supplierCode IS NOT NULL AND supplierCode != ''
+                ORDER BY supplierCode
+            """
+            return execute_query(sql) or []
+        except Exception as e:
+            logger.error(f"获取社区选项异常: {e}")
+            return []
 
     def get_user_statistics(self):
         """获取用户统计信息"""

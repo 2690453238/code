@@ -122,7 +122,7 @@ class SalesForecastService:
         test_days: int = 14,
         product_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """执行批量预测"""
+        """执行批量预测（社区团长端加权本社区商品）"""
         artifact = self._load_or_train_artifact(supplier_id, forecast_days, test_days)
         if isinstance(artifact, dict) and artifact.get("code"):
             return artifact
@@ -140,7 +140,7 @@ class SalesForecastService:
         test_days: int = 14,
         trend_days: int = 30,
     ) -> Dict[str, Any]:
-        """获取销量趋势看板数据"""
+        """获取销量趋势看板数据（社区团长端加权本社区商品）"""
         artifact = self._load_or_train_artifact(supplier_id, forecast_days, test_days)
         if isinstance(artifact, dict) and artifact.get("code"):
             return artifact
@@ -205,13 +205,7 @@ class SalesForecastService:
         return dataset
 
     def _fetch_product_frame(self, supplier_id: Optional[int]) -> pd.DataFrame:
-        """查询商品基础信息"""
-        condition_sql = ""
-        params: List[Any] = []
-        if supplier_id is not None:
-            condition_sql = "AND p.supplierId = %s"
-            params.append(supplier_id)
-
+        """查询商品基础信息（始终查询所有社区的商品）"""
         sql = f"""
             SELECT
                 p.id AS product_id,
@@ -234,21 +228,16 @@ class SalesForecastService:
             LEFT JOIN py_category c ON p.categoryId = c.id
             LEFT JOIN py_user u ON p.supplierId = u.id
             WHERE p.status = 1
-            {condition_sql}
         """
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
-                cursor.execute(sql, params)
+                cursor.execute(sql)
                 rows = cursor.fetchall()
         return pd.DataFrame(rows)
 
     def _fetch_sales_frame(self, supplier_id: Optional[int]) -> pd.DataFrame:
-        """查询历史日销量"""
+        """查询历史日销量（始终查询所有社区订单）"""
         params: List[Any] = list(VALID_ORDER_STATUS)
-        scope_sql = ""
-        if supplier_id is not None:
-            scope_sql = "AND o.supplierId = %s"
-            params.append(supplier_id)
 
         sql = f"""
             SELECT
@@ -276,7 +265,6 @@ class SalesForecastService:
             JOIN py_order o ON oi.orderId = o.id
             JOIN py_product p ON oi.productId = p.id
             WHERE o.status IN (%s, %s, %s, %s)
-              {scope_sql}
             GROUP BY DATE(STR_TO_DATE(o.createTime, '%%Y-%%m-%%d %%H:%%i:%%s')), p.id
             ORDER BY sale_date, p.id
         """
@@ -488,20 +476,21 @@ class SalesForecastService:
         forecast_days: int,
         test_days: int,
     ) -> Any:
-        """加载或训练模型产物"""
-        path = self._artifact_path(supplier_id)
+        """加载或训练模型产物（始终基于全平台数据训练，supplier_id仅用于作用域标记）"""
+        path = self._artifact_path(None)
         if not os.path.exists(path):
-            train_result = self.train_model(supplier_id, forecast_days, test_days)
+            train_result = self.train_model(None, forecast_days, test_days)
             if train_result["code"] != 200:
                 return train_result
         with open(path, "rb") as file_obj:
             artifact = pickle.load(file_obj)
         if artifact.get("featureColumns") != self._get_feature_columns():
-            train_result = self.train_model(supplier_id, forecast_days, test_days)
+            train_result = self.train_model(None, forecast_days, test_days)
             if train_result["code"] != 200:
                 return train_result
             with open(path, "rb") as file_obj:
                 artifact = pickle.load(file_obj)
+        artifact["caller_supplier_id"] = supplier_id
         return artifact
 
     def _get_cached_forecast(self, artifact: Dict[str, Any], forecast_days: int) -> pd.DataFrame:

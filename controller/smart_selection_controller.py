@@ -134,3 +134,43 @@ def get_seasonal():
         ),
         "获取季节性选品失败",
     )
+
+
+@smart_selection_bp.route("/slow-moving/discount", methods=["POST"])
+@login_required
+def set_slow_moving_discount():
+    def action():
+        supplier_id = _resolve_supplier_id()
+        if not supplier_id:
+            return error("无法识别当前用户")
+        data = request.get_json(silent=True) or {}
+        product_id = data.get("productId")
+        discount_rate = data.get("discountRate")
+        if not product_id or discount_rate is None:
+            return error("缺少参数: productId, discountRate")
+        return service.set_slow_moving_discount(supplier_id, product_id, float(discount_rate))
+
+    return _execute(
+        _has_community_permission,
+        action,
+        "设置滞销折扣失败",
+    )
+
+
+@smart_selection_bp.route("/slow-moving/discount", methods=["DELETE"])
+@login_required
+def clear_slow_moving_discount():
+    def action():
+        supplier_id = _resolve_supplier_id()
+        if not supplier_id:
+            return error("无法识别当前用户")
+        product_id = request.args.get("productId", type=int)
+        if not product_id:
+            return error("缺少参数: productId")
+        return service.clear_slow_moving_discount(supplier_id, product_id)
+
+    return _execute(
+        _has_community_permission,
+        action,
+        "清除滞销折扣失败",
+    )

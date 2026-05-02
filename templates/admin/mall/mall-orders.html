@@ -110,34 +110,34 @@
                         <el-table-column label="操作"fixed="right" width="200">
                             <template slot-scope="scope">
                                 <el-button type="text" @click="viewOrderDetail(scope.row)">查看详情</el-button>
-                                <el-button 
-                                    v-if="scope.row.status === 'paid'" 
-                                    type="text" 
+                                <el-button
+                                    v-if="scope.row.status === 'paid' && userRole !== 'platform_operator'"
+                                    type="text"
                                     @click="shipOrder(scope.row)">
                                     发货
                                 </el-button>
-                                <el-button 
-                                    v-if="scope.row.status === 'shipped' || scope.row.status === 'delivered'" 
-                                    type="text" 
+                                <el-button
+                                    v-if="(scope.row.status === 'shipped' || scope.row.status === 'delivered') && userRole !== 'platform_operator'"
+                                    type="text"
                                     @click="editLogistics(scope.row)">
                                     物流信息
                                 </el-button>
-                                <el-button 
-                                    v-if="scope.row.status === 'shipped'" 
-                                    type="text" 
+                                <el-button
+                                    v-if="scope.row.status === 'shipped' && userRole !== 'platform_operator'"
+                                    type="text"
                                     @click="completeOrder(scope.row)">
                                     完成
                                 </el-button>
-                                <el-button 
-                                    v-if="scope.row.status === 'cancel_requested'" 
-                                    type="text" 
+                                <el-button
+                                    v-if="scope.row.status === 'cancel_requested' && userRole !== 'platform_operator'"
+                                    type="text"
                                     style="color: #67c23a;"
                                     @click="approveCancelRequest(scope.row, true)">
                                     通过
                                 </el-button>
-                                <el-button 
-                                    v-if="scope.row.status === 'cancel_requested'" 
-                                    type="text" 
+                                <el-button
+                                    v-if="scope.row.status === 'cancel_requested' && userRole !== 'platform_operator'"
+                                    type="text"
                                     style="color: #f56c6c;"
                                     @click="approveCancelRequest(scope.row, false)">
                                     拒绝
@@ -324,6 +324,7 @@
             data() {
                 return {
                     userInfo: {},
+                    userRole: '',
                     orders: [],
                     loading: false,
                     currentPage: 1,
@@ -359,7 +360,8 @@
                 checkAuth() {
                     const userInfo = localStorage.getItem('userInfo');
                     if (userInfo) {
-                        this.userInfo = JSON.parse(userInfo); 
+                        this.userInfo = JSON.parse(userInfo);
+                        this.userRole = this.userInfo.role || '';
                     } else {
                         this.$message.warning('请先登录');
                         window.location.href = '/login';

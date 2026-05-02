@@ -95,18 +95,18 @@ const LayoutConfig = {
             roles: ['system_admin']
         },
         {
-            index: 'system-data',
-            title: '数据管理',
-            path: '/admin/mall/mall-products.html',
-            icon: 'el-icon-folder-opened',
-            roles: ['system_admin', 'community_leader', 'supplier']
-        },
-        {
             index: 'system-config',
             title: '系统配置',
             path: '/admin/system-config.html',
             icon: 'el-icon-setting',
             roles: ['system_admin']
+        },
+        {
+            index: 'operator-orders',
+            title: '订单管理',
+            path: '/admin/mall/mall-orders.html',
+            icon: 'el-icon-s-order',
+            roles: ['platform_operator']
         },
         {
             index: 'operator-data',
@@ -123,13 +123,6 @@ const LayoutConfig = {
             roles: ['platform_operator']
         },
         {
-            index: 'data-collection',
-            title: '数据管理',
-            path: '/admin/mall/mall-products.html',
-            icon: 'el-icon-download',
-            roles: ['platform_operator']
-        },
-        {
             index: 'visual-analysis',
             title: '可视化分析',
             path: '/admin/operation-report.html',
@@ -137,25 +130,18 @@ const LayoutConfig = {
             roles: ['platform_operator']
         },
         {
-            index: 'mall-orders',
-            title: '订单管理',
-            path: '/admin/mall/mall-orders.html',
-            icon: 'el-icon-s-order',
-            roles: ['system_admin', 'platform_operator', 'community_leader', 'supplier']
-        },
-        {
-            index: 'complaints',
-            title: '反馈投诉',
-            path: '/admin/complaints.html',
-            icon: 'el-icon-warning',
-            roles: ['system_admin', 'platform_operator', 'community_leader', 'supplier']
-        },
-        {
             index: 'announcements',
             title: '消息公告',
             path: '/admin/announcements.html',
             icon: 'el-icon-chat-line-square',
             roles: ['system_admin', 'platform_operator', 'community_leader', 'supplier']
+        },
+        {
+            index: 'complaints',
+            title: '投诉管理',
+            path: '/admin/complaints.html',
+            icon: 'el-icon-warning',
+            roles: ['platform_operator']
         },
         {
             index: 'community-analysis',
@@ -179,10 +165,24 @@ const LayoutConfig = {
             roles: ['community_leader', 'supplier']
         },
         {
+            index: 'community-orders',
+            title: '订单管理',
+            path: '/admin/mall/mall-orders.html',
+            icon: 'el-icon-s-order',
+            roles: ['community_leader', 'supplier']
+        },
+        {
             index: 'community-after-sale',
             title: '售后管理',
             path: '/admin/supplier/after-sale.html',
             icon: 'el-icon-warning-outline',
+            roles: ['community_leader', 'supplier']
+        },
+        {
+            index: 'community-complaints',
+            title: '投诉管理',
+            path: '/admin/complaints.html',
+            icon: 'el-icon-warning',
             roles: ['community_leader', 'supplier']
         },
         {
@@ -207,19 +207,19 @@ const LayoutConfig = {
         },
         system_admin: {
             '系统运维': ['system-dashboard', 'user-permission', 'community-leader-manage'],
-            '基础配置': ['system-data', 'system-config'],
-            '业务管理': ['mall-orders', 'announcements'],
+            '基础配置': ['system-config'],
             '个人设置': ['profile']
         },
         platform_operator: {
-            '运营中台': ['operator-data', 'operator-sales-forecast', 'data-collection'],
+            '运营中台': ['operator-orders', 'operator-data', 'operator-sales-forecast'],
             '数据分析': ['visual-analysis'],
-            '业务管理': ['mall-orders', 'announcements'],
+            '服务管理': ['complaints', 'announcements'],
             '个人设置': ['profile']
         },
         community_leader: {
-            '社区经营': ['community-analysis', 'community-sales-forecast', 'community-smart-selection', 'system-data', 'mall-orders'],
-            '服务管理': ['announcements', 'community-after-sale'],
+            '社区经营': ['community-analysis', 'community-sales-forecast', 'community-smart-selection'],
+            '订单管理': ['community-orders'],
+            '服务管理': ['announcements', 'community-after-sale', 'community-complaints'],
             '个人设置': ['profile']
         }
     }

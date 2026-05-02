@@ -366,6 +366,22 @@
                         </el-select>
                     </el-form-item>
 
+                    <el-form-item prop="supplierCode">
+                        <el-select
+                            v-model="registerForm.supplierCode"
+                            placeholder="请选择所属社区"
+                            size="medium"
+                            style="width:100%"
+                            @change="onCommunityChange">
+                            <el-option
+                                v-for="item in communityOptions"
+                                :key="item.supplierCode"
+                                :label="item.supplierName"
+                                :value="item.supplierCode">
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+
                     <el-form-item>
                         <button
                             class="register-btn"
@@ -394,6 +410,8 @@
                 return {
                     loading: false,
                     roleOptions: [],
+                    communityOptions: [],
+                    communityMap: {},
                     registerForm: {
                         username: '',
                         password: '',
@@ -401,7 +419,9 @@
                         nickname: '',
                         email: '',
                         phone: '',
-                        role: 'user'
+                        role: 'user',
+                        supplierCode: '',
+                        supplierName: ''
                     },
                     registerRules: {
                         username: [
@@ -427,14 +447,34 @@
                         ],
                         role: [
                             { required: true, message: '请选择角色', trigger: 'change' }
+                        ],
+                        supplierCode: [
+                            { required: true, message: '请选择所属社区', trigger: 'change' }
                         ]
                     }
                 }
             },
             created() {
                 this.loadRoleOptions();
+                this.loadCommunityOptions();
             },
             methods: {
+                loadCommunityOptions() {
+                    axios.get('/api/auth/community-options').then(response => {
+                        if (response.data.code === 200) {
+                            this.communityOptions = response.data.data || [];
+                            this.communityMap = {};
+                            this.communityOptions.forEach(item => {
+                                this.communityMap[item.supplierCode] = item.supplierName;
+                            });
+                        }
+                    }).catch(error => {
+                        console.error('加载社区列表失败:', error);
+                    });
+                },
+                onCommunityChange(code) {
+                    this.registerForm.supplierName = this.communityMap[code] || '';
+                },
                 loadRoleOptions() {
                     this.roleOptions = LayoutConfig.utils.getRegisterRoles();
                     if (this.roleOptions.length > 0) {

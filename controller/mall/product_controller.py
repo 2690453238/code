@@ -69,7 +69,8 @@ def get_hot_products():
     """获取热门商品"""
     try:
         limit = request.args.get('limit', 10, type=int)
-        return jsonify(product_service.get_hot_products(limit))
+        current_user = get_current_user()
+        return jsonify(product_service.get_hot_products(limit, current_user))
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)})
 
@@ -79,7 +80,8 @@ def get_new_products():
     """获取新品商品"""
     try:
         limit = request.args.get('limit', 10, type=int)
-        return jsonify(product_service.get_new_products(limit))
+        current_user = get_current_user()
+        return jsonify(product_service.get_new_products(limit, current_user))
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)})
 

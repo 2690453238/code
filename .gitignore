@@ -23,3 +23,6 @@ upload/
 # OS
 Thumbs.db
 .DS_Store
+
+# Prediction cache (auto-generated, not model files)
+Predictive/artifacts/pred_*.pkl

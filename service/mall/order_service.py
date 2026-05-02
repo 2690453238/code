@@ -136,6 +136,22 @@ class OrderService:
                     if supplier_error:
                         return supplier_error
                     
+                    # 检查库存和社区归属
+                    for item in data['items']:
+                        product_id = item.get('productId')
+                        quantity = int(item.get('quantity', 0))
+                        cursor.execute(
+                            "SELECT id, name, stock, supplierId FROM py_product WHERE id = %s LIMIT 1",
+                            (product_id,)
+                        )
+                        product = cursor.fetchone()
+                        if not product:
+                            return error(f'商品不存在: {item.get("productName", "")}')
+                        if product['stock'] < quantity:
+                            return error(f'商品 [{product["name"]}] 库存不足，仅剩 {product["stock"]} 件')
+                        if supplier_id is not None and product['supplierId'] != supplier_id:
+                            return error(f'商品 [{product["name"]}] 不属于当前社区，无法购买')
+
                     # 计算订单总金额
                     total_amount = Decimal('0')
                     for item in data['items']:
@@ -243,9 +259,21 @@ class OrderService:
                         
                         deleted_count = cursor.rowcount
                         print(f"删除购物车商品成功，影响行数: {deleted_count}")
-                    
+
+                    # 扣减库存
+                    for item in data['items']:
+                        product_id = item.get('productId')
+                        quantity = int(item.get('quantity', 0))
+                        cursor.execute(
+                            "UPDATE py_product SET stock = stock - %s WHERE id = %s AND stock >= %s",
+                            (quantity, product_id, quantity)
+                        )
+                        if cursor.rowcount == 0:
+                            conn.rollback()
+                            return error(f'商品 [{item.get("productName", "")}] 库存扣减失败，请重试')
+
                     conn.commit()
-                    
+
                     return success({'orderId': order_id, 'orderNo': order_number}, '订单创建成功')
         except Exception as e:
             print(f"创建订单失败: {e}")

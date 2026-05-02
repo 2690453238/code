@@ -174,11 +174,11 @@ class ComplaintService:
 
     @staticmethod
     def admin_list(page=1, limit=10, status='', complaint_type='', keyword=''):
-        """后台获取投诉列表（分页+筛选）"""
+        """后台获取投诉列表（分页+筛选，不包含已关闭的投诉）"""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    where = []
+                    where = ["c.status != 'closed'"]
                     params = []
                     if status:
                         where.append('c.status = %s')
@@ -190,7 +190,7 @@ class ComplaintService:
                         where.append('(c.title LIKE %s OR c.complaintNo LIKE %s OR u.username LIKE %s)')
                         kw = f'%{keyword}%'
                         params.extend([kw, kw, kw])
-                    where_sql = ('WHERE ' + ' AND '.join(where)) if where else ''
+                    where_sql = 'WHERE ' + ' AND '.join(where)
 
                     cur.execute(
                         f'SELECT COUNT(*) AS total FROM py_complaint c '
@@ -199,9 +199,10 @@ class ComplaintService:
                     )
                     total = cur.fetchone()['total']
 
-                    # 各状态统计
+                    # 各状态统计（不含已关闭）
                     cur.execute("""
-                        SELECT status, COUNT(*) AS cnt FROM py_complaint GROUP BY status
+                        SELECT status, COUNT(*) AS cnt FROM py_complaint
+                        WHERE status != 'closed' GROUP BY status
                     """)
                     status_stats = {r['status']: r['cnt'] for r in cur.fetchall()}
 
@@ -218,7 +219,7 @@ class ComplaintService:
                         LEFT JOIN py_user u ON c.userId = u.id
                         {where_sql}
                         ORDER BY
-                            FIELD(c.status,'pending','processing','resolved','rejected','closed'),
+                            FIELD(c.status,'pending','processing','resolved','rejected'),
                             c.priority DESC, c.createTime DESC
                         LIMIT %s OFFSET %s
                         """,

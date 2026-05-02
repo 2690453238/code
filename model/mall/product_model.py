@@ -122,9 +122,9 @@ class ProductModel:
         try:
             with self.db.cursor() as cursor:
                 sql = """
-                    INSERT INTO py_product (supplierId, name, description, categoryId, brand, mainImage, 
-                                          galleryImages, price, originalPrice, stock, status, isHot, isNew)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO py_product (supplierId, name, description, categoryId, brand, mainImage,
+                                          galleryImages, price, costPrice, originalPrice, stock, status, isHot, isNew)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 params = (
                     product_data.get('supplierId'),
@@ -135,6 +135,7 @@ class ProductModel:
                     product_data.get('mainImage', ''),
                     product_data.get('galleryImages', ''),
                     product_data['price'],
+                    product_data.get('costPrice'),
                     product_data.get('originalPrice'),
                     product_data.get('stock', 0),
                     product_data.get('status', 1),
@@ -160,8 +161,8 @@ class ProductModel:
                 update_fields = []
                 params = []
                 
-                for field in ['name', 'description', 'categoryId', 'brand', 'mainImage', 
-                             'galleryImages', 'price', 'originalPrice', 'stock', 'status', 'isHot', 'isNew']:
+                for field in ['name', 'description', 'categoryId', 'brand', 'mainImage',
+                             'galleryImages', 'price', 'costPrice', 'originalPrice', 'stock', 'status', 'isHot', 'isNew']:
                     if field in product_data:
                         update_fields.append(f"{field} = %s")
                         params.append(product_data[field])

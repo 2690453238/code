@@ -49,7 +49,6 @@
                             </el-form-item>
                             <el-form-item label="角色">
                                 <el-select v-model="searchForm.role" placeholder="选择角色" clearable>
-                                    <el-option label="系统管理员" value="system_admin"></el-option>
                                     <el-option label="平台运营" value="platform_operator"></el-option>
                                     <el-option label="社区团长" value="community_leader"></el-option>
                                     <el-option label="普通用户" value="user"></el-option>
@@ -76,7 +75,11 @@
                         </div>
 
                         <el-table :data="userList" v-loading="tableLoading" stripe style="width: 100%">
-                            <el-table-column prop="id" label="ID" width="80"></el-table-column>
+                            <el-table-column label="序号" width="80">
+                            <template #default="scope">
+                                {{ (pagination.pageNum - 1) * pagination.pageSize + scope.$index + 1 }}
+                            </template>
+                        </el-table-column>
                             <el-table-column prop="username" label="用户名" min-width="120"></el-table-column>
                             <el-table-column prop="nickname" label="昵称" min-width="120"></el-table-column>
                             <el-table-column prop="avatar" label="头像" width="80">
@@ -86,6 +89,11 @@
                             </el-table-column>
                             <el-table-column prop="email" label="邮箱" min-width="180"></el-table-column>
                             <el-table-column prop="phone" label="手机号" width="140"></el-table-column>
+                            <el-table-column label="所属社区" min-width="140">
+                                <template #default="scope">
+                                    {{ scope.row.supplierName || '-' }}
+                                </template>
+                            </el-table-column>
                             <el-table-column prop="role" label="角色" width="150">
                                 <template #default="scope">
                                     <el-tag :type="getRoleTagType(scope.row.role)" size="small">
@@ -193,6 +201,22 @@
 
                         <el-row :gutter="20">
                             <el-col :span="12">
+                                <el-form-item label="所属社区">
+                                    <el-select v-model="userForm.supplierCode" placeholder="选择社区" clearable filterable @change="onCommunityChange">
+                                        <el-option
+                                            v-for="item in communityOptions"
+                                            :key="item.supplierCode"
+                                            :label="item.supplierName"
+                                            :value="item.supplierCode">
+                                        </el-option>
+                                        <el-option label="无" value=""></el-option>
+                                    </el-select>
+                                </el-form-item>
+                            </el-col>
+                        </el-row>
+
+                        <el-row :gutter="20">
+                            <el-col :span="12">
                                 <el-form-item label="年龄">
                                     <el-input v-model="userForm.age" type="number"></el-input>
                                 </el-form-item>
@@ -266,6 +290,8 @@
                     },
                     userList: [],
                     tableLoading: false,
+                    communityOptions: [],
+                    communityMap: {},
                     pagination: {
                         pageNum: 1,
                         pageSize: 10,
@@ -289,7 +315,9 @@
                         role: 'user',
                         status: 'active',
                         content: '',
-                        remarks: ''
+                        remarks: '',
+                        supplierCode: '',
+                        supplierName: ''
                     },
                     userRules: {
                         username: [
@@ -336,6 +364,7 @@
             },
             mounted() {
                 this.loadUserList();
+                this.loadCommunityOptions();
                 this.passwordRules.confirmPassword.push({
                     validator: this.validateConfirmPassword,
                     trigger: 'blur'
@@ -365,6 +394,22 @@
                     }).finally(() => {
                         this.tableLoading = false;
                     });
+                },
+                loadCommunityOptions() {
+                    axios.get('/api/user/community-options').then(response => {
+                        if (response.data.code === 200) {
+                            this.communityOptions = response.data.data || [];
+                            this.communityMap = {};
+                            this.communityOptions.forEach(item => {
+                                this.communityMap[item.supplierCode] = item.supplierName;
+                            });
+                        }
+                    }).catch(error => {
+                        console.error('加载社区选项失败:', error);
+                    });
+                },
+                onCommunityChange(code) {
+                    this.userForm.supplierName = code ? (this.communityMap[code] || '') : '';
                 },
                 searchUsers() {
                     this.pagination.pageNum = 1;
@@ -409,7 +454,9 @@
                         role: user.role,
                         status: user.status,
                         content: user.content,
-                        remarks: user.remarks
+                        remarks: user.remarks,
+                        supplierCode: user.supplierCode || '',
+                        supplierName: user.supplierName || ''
                     };
                     this.dialogVisible = true;
                 },
@@ -500,7 +547,9 @@
                         role: 'user',
                         status: 'active',
                         content: '',
-                        remarks: ''
+                        remarks: '',
+                        supplierCode: '',
+                        supplierName: ''
                     };
                     this.$nextTick(() => {
                         if (this.$refs.userForm) {

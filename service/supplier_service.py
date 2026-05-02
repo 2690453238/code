@@ -166,7 +166,7 @@ class SupplierService:
 
                 offset = (page_num - 1) * page_size
                 data_sql = f"""
-                    SELECT id, name, price, originalPrice, stock, sales, status,
+                    SELECT id, name, price, costPrice, originalPrice, stock, sales, status,
                            mainImage, categoryId, brand, isHot, isNew, createTime
                     FROM py_product
                     WHERE {where_clause}

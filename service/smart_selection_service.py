@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from utils.db_utils import get_db_connection
 from utils.response import error, success
 
+from service.purchase_service import PurchaseService
+
 
 class SmartSelectionService:
     """智能选品服务"""
@@ -86,15 +88,26 @@ class SmartSelectionService:
 
     # ── 新品推荐 ──────────────────────────────────────────
 
-    def _build_new_product_score(self, row: Dict[str, Any]) -> float:
-        """计算新品推荐综合分数"""
+    def _build_new_product_score(
+        self, row: Dict[str, Any], supplier_id: Optional[int] = None
+    ) -> float:
+        """计算新品推荐综合分数（社区团长端加重本社区偏好）"""
         sales = float(row.get("sales") or 0)
         browse_count = float(row.get("browse_count") or 0)
         is_hot = 10 if row.get("isHot") else 0
         is_new = 5 if row.get("isNew") else 0
         price = float(row.get("price") or 0)
         price_penalty = min(price / 100, 20)
-        return sales * 0.4 + browse_count * 0.3 + is_hot + is_new - price_penalty
+        score = sales * 0.4 + browse_count * 0.3 + is_hot + is_new - price_penalty
+
+        # 社区偏好加成：该品类在本社区的销量越好，加成越高
+        if supplier_id is not None:
+            category_id = row.get("categoryId")
+            if category_id:
+                affinity = self._get_category_community_affinity(supplier_id, category_id)
+                score += affinity * 15  # 最高可加15分
+
+        return score
 
     def _build_reason(
         self, row: Dict[str, Any], score: float, forecast_qty: int = 0
@@ -117,6 +130,38 @@ class SmartSelectionService:
             else:
                 parts.append("同类商品推荐")
         return "、".join(parts[:3])
+
+    def _get_category_community_affinity(
+        self, supplier_id: int, category_id: int
+    ) -> float:
+        """计算该社区对某品类的偏好度（0~1），基于该品类在本社区的销量占比"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT
+                            SUM(oi.quantity) AS cat_qty,
+                            (SELECT SUM(oi2.quantity)
+                             FROM py_order_item oi2
+                             JOIN py_order o2 ON oi2.orderId = o2.id
+                             WHERE o2.supplierId = %s
+                               AND o2.status IN ('paid','shipped','delivered','completed')
+                            ) AS total_qty
+                        FROM py_order_item oi
+                        JOIN py_order o ON oi.orderId = o.id
+                        JOIN py_product p ON oi.productId = p.id
+                        WHERE o.supplierId = %s
+                          AND o.status IN ('paid','shipped','delivered','completed')
+                          AND p.categoryId = %s
+                    """, (supplier_id, supplier_id, category_id))
+                    row = cursor.fetchone()
+                    cat_qty = float(row["cat_qty"] or 0)
+                    total_qty = float(row["total_qty"] or 0)
+                    if total_qty > 0:
+                        return min(cat_qty / total_qty * 2, 1.0)  # 占比*2，上限1.0
+            return 0.0
+        except Exception:
+            return 0.0
 
     def _count_new_product_candidates(self, supplier_id: Optional[int]) -> int:
         """统计可推荐的新品数量"""
@@ -191,7 +236,7 @@ class SmartSelectionService:
             product_id = int(row["id"])
             forecast_qty = forecast_map.get(product_id, 0)
 
-            score = self._build_new_product_score(row)
+            score = self._build_new_product_score(row, supplier_id)
             if forecast_qty > 0:
                 score += min(forecast_qty / 10, 15)
 
@@ -277,7 +322,8 @@ class SmartSelectionService:
                 p.id, p.name, p.mainImage, p.price, p.stock, p.sales,
                 c.name AS categoryName,
                 COALESCE(ds.daily_sales, 0) AS daily_avg_sales,
-                ds.last_sale_date
+                ds.last_sale_date,
+                sd.discountRate
             FROM py_product p
             LEFT JOIN py_category c ON p.categoryId = c.id
             LEFT JOIN (
@@ -291,6 +337,7 @@ class SmartSelectionService:
                   AND STR_TO_DATE(o.createTime, '%%Y-%%m-%%d %%H:%%i:%%s') >= DATE_SUB(NOW(), INTERVAL 90 DAY)
                 GROUP BY oi.productId
             ) ds ON ds.productId = p.id
+            LEFT JOIN py_supplier_discount sd ON sd.productId = p.id AND sd.supplierId = p.supplierId
             WHERE p.status = 1
               {scope_sql}
             ORDER BY p.stock DESC
@@ -336,6 +383,7 @@ class SmartSelectionService:
                 "riskLevel": risk_level,
                 "tagType": tag_type,
                 "suggestion": suggestion,
+                "discountRate": float(row["discountRate"]) if row.get("discountRate") else None,
             })
 
         results.sort(
@@ -539,66 +587,49 @@ class SmartSelectionService:
     def batch_purchase(
         self, supplier_id: int, products: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
-        """批量采购：将推荐商品复制到团长自己的商品列表，支持自定义采购数量"""
-        if not products:
-            return error("请选择要采购的商品")
+        """一键采购：生成采购订单（按进价计算），而非直接复制商品"""
+        ps = PurchaseService()
+        return ps.create_order(supplier_id, products)
 
-        product_ids = [p["productId"] for p in products]
-        quantity_map = {p["productId"]: max(int(p.get("quantity", 10)), 1) for p in products}
+    # ── 滞销商品折扣 ──────────────────────────────────────────
 
-        with get_db_connection() as conn:
-            with conn.cursor() as cursor:
-                placeholders = ",".join(["%s"] * len(product_ids))
-                cursor.execute(
-                    f"SELECT * FROM py_product WHERE id IN ({placeholders}) AND status = 1",
-                    product_ids,
-                )
-                source_products = cursor.fetchall()
-
-                if not source_products:
-                    return error("未找到指定的商品")
-
-                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                new_ids = []
-
-                for prod in source_products:
+    def set_slow_moving_discount(
+        self, supplier_id: int, product_id: int, discount_rate: float,
+    ) -> Dict[str, Any]:
+        """设置滞销商品折扣率（discount_rate: 0.00~1.00，如0.8=八折）"""
+        if not 0 < discount_rate <= 1:
+            return error("折扣率应在 0~1 之间")
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
                     cursor.execute(
-                        "SELECT id FROM py_product WHERE supplierId = %s AND name = %s AND status = 1",
-                        (supplier_id, prod["name"]),
+                        """INSERT INTO py_supplier_discount (supplierId, productId, discountRate)
+                           VALUES (%s, %s, %s)
+                           ON DUPLICATE KEY UPDATE discountRate = %s, updated_at = NOW()""",
+                        (supplier_id, product_id, discount_rate, discount_rate),
                     )
-                    if cursor.fetchone():
-                        continue
+                    conn.commit()
+                    return success(None, "折扣已设置")
+        except Exception as e:
+            print(f"设置折扣失败: {e}")
+            return error("设置折扣失败")
 
-                    purchase_qty = quantity_map.get(int(prod["id"]), 10)
-
+    def clear_slow_moving_discount(
+        self, supplier_id: int, product_id: int,
+    ) -> Dict[str, Any]:
+        """清除滞销商品折扣"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
                     cursor.execute(
-                        """INSERT INTO py_product
-                        (supplierId, name, description, categoryId, brand, mainImage, galleryImages,
-                         price, originalPrice, stock, sales, status, isHot, isNew, createTime, updateTime)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 0, 1, 0, 0, %s, %s)""",
-                        (
-                            supplier_id,
-                            prod["name"],
-                            prod["description"],
-                            prod["categoryId"],
-                            prod["brand"],
-                            prod["mainImage"],
-                            prod.get("galleryImages"),
-                            prod["price"],
-                            prod.get("originalPrice"),
-                            purchase_qty,
-                            now,
-                            now,
-                        ),
+                        "DELETE FROM py_supplier_discount WHERE supplierId = %s AND productId = %s",
+                        (supplier_id, product_id),
                     )
-                    new_ids.append(cursor.lastrowid)
-
-                conn.commit()
-
-        return success({
-            "purchasedCount": len(new_ids),
-            "newProductIds": new_ids,
-        })
+                    conn.commit()
+                    return success(None, "折扣已清除")
+        except Exception as e:
+            print(f"清除折扣失败: {e}")
+            return error("清除折扣失败")
 
     # ── 库存健康度 ─────────────────────────────────────────
 

@@ -17,13 +17,16 @@ def login():
         data = request.get_json() or {}
         username = data.get('username')
         password = data.get('password')
+        role = data.get('role')
 
         if not username or not password:
             return jsonify(error("用户名和密码不能为空"))
+        if not role:
+            return jsonify(error("请选择登录角色"))
 
-        user = auth_service.login(username, password)
+        user = auth_service.login(username, password, role)
         if not user:
-            return jsonify(error("用户名或密码错误"))
+            return jsonify(error("用户名、密码或角色不匹配"))
 
         set_user_session(user)
         redirect_url = auth_service.get_role_home_page(user['role'])
@@ -44,18 +47,34 @@ def register():
         nickname = data.get('nickname')
         email = data.get('email')
         phone = data.get('phone')
+        supplier_code = data.get('supplierCode')
+        supplier_name = data.get('supplierName')
 
         if not username or not password:
             return jsonify(error("用户名和密码不能为空"))
+        if not supplier_code:
+            return jsonify(error("请选择所属社区"))
 
-        result = auth_service.register(username, password, nickname, email, phone)
+        result = auth_service.register(username, password, nickname, email, phone,
+                                        supplier_code, supplier_name)
         if result:
-            logger.info(f"用户 {username} 注册成功")
+            logger.info(f"用户 {username} 注册成功，社区 {supplier_name}")
             return jsonify(success(None, "注册成功"))
         return jsonify(error("注册失败，用户名可能已存在"))
     except Exception as e:
         logger.error(f"注册异常: {e}")
         return jsonify(error("注册失败，请稍后重试"))
+
+
+@auth_bp.route('/community-options', methods=['GET'])
+def community_options():
+    """获取可注册的社区列表"""
+    try:
+        communities = auth_service.get_community_options()
+        return jsonify(success(communities, "获取社区列表成功"))
+    except Exception as e:
+        logger.error(f"获取社区列表异常: {e}")
+        return jsonify(error("获取社区列表失败"))
 
 
 @auth_bp.route('/logout', methods=['POST'])

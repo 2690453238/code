@@ -23,6 +23,13 @@ def _get_supplier_scope():
     return None
 
 
+def _check_write_permission():
+    """检查是否有修改权限：平台运营者只读，不可修改订单"""
+    if session.get('role') == 'platform_operator':
+        return False
+    return True
+
+
 @order_bp.route('/', methods=['GET'])
 @login_required
 def get_orders():
@@ -180,6 +187,8 @@ def get_cancel_requests():
 def approve_cancel_request(order_id):
     """审核取消申请"""
     try:
+        if not _check_write_permission():
+            return jsonify({"code": 403, "message": "平台运营者无权修改订单"})
         data = request.get_json()
         approve = data.get('approve', True)
         return jsonify(
@@ -198,6 +207,8 @@ def approve_cancel_request(order_id):
 def ship_order(order_id):
     """订单发货"""
     try:
+        if not _check_write_permission():
+            return jsonify({"code": 403, "message": "平台运营者无权修改订单"})
         data = request.get_json()
         tracking_number = data.get('trackingNumber', '')
         shipping_company = data.get('shippingCompany', '')
@@ -224,6 +235,8 @@ def ship_order(order_id):
 def complete_order(order_id):
     """完成订单"""
     try:
+        if not _check_write_permission():
+            return jsonify({"code": 403, "message": "平台运营者无权修改订单"})
         return jsonify(order_service.complete_order(order_id, supplier_id=_get_supplier_scope()))
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)})
@@ -234,6 +247,8 @@ def complete_order(order_id):
 def update_logistics(order_id):
     """更新物流信息"""
     try:
+        if not _check_write_permission():
+            return jsonify({"code": 403, "message": "平台运营者无权修改订单"})
         data = request.get_json()
         logistics_info = data.get('logisticsInfo', '')
         return jsonify(

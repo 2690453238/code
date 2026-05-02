@@ -16,7 +16,7 @@ class AuthService:
         'user': '/front/mall/mall.html'
     }
 
-    def login(self, username, password):
+    def login(self, username, password, role=None):
         """用户登录验证"""
         try:
             sql = """
@@ -34,6 +34,10 @@ class AuthService:
             user = users[0]
             if user['password'] != password:
                 logger.warning(f"用户 {username} 密码错误")
+                return None
+
+            if role and user['role'] != role:
+                logger.warning(f"用户 {username} 角色不匹配：期望 {role}，实际 {user['role']}")
                 return None
 
             current_time = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -60,7 +64,7 @@ class AuthService:
             logger.error(f"用户登录验证异常: {e}")
             return None
 
-    def register(self, username, password, nickname=None, email=None, phone=None):
+    def register(self, username, password, nickname=None, email=None, phone=None, supplier_code=None, supplier_name=None):
         """用户注册"""
         try:
             check_sql = "SELECT id FROM py_user WHERE username = %s"
@@ -72,19 +76,35 @@ class AuthService:
             current_time = time.strftime('%Y-%m-%d %H:%M:%S')
             insert_sql = """
                 INSERT INTO py_user
-                (username, password, nickname, email, phone, role, status, createtime, updatetime)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (username, password, nickname, email, phone, role, status, createtime, updatetime,
+                 supplierCode, supplierName)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """
             execute_insert(
                 insert_sql,
-                (username, password, nickname, email, phone, 'user', 'active', current_time, current_time)
+                (username, password, nickname, email, phone, 'user', 'active', current_time, current_time,
+                 supplier_code, supplier_name)
             )
 
-            logger.info(f"用户 {username} 注册成功")
+            logger.info(f"用户 {username} 注册成功，加入社区 {supplier_name}")
             return True
         except Exception as e:
             logger.error(f"用户注册异常: {e}")
             return False
+
+    def get_community_options(self):
+        """获取所有社区选项"""
+        try:
+            sql = """
+                SELECT DISTINCT supplierCode, supplierName
+                FROM py_user
+                WHERE supplierCode IS NOT NULL AND supplierCode != ''
+                ORDER BY supplierCode
+            """
+            return execute_query(sql) or []
+        except Exception as e:
+            logger.error(f"获取社区选项异常: {e}")
+            return []
 
     def check_username_exists(self, username):
         """检查用户名是否存在"""
