@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>售后管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .page-container {
+            padding: 20px;
+        }
+
+        .search-card,
+        .table-card {
+            margin-bottom: 20px;
+        }
+
+        .dialog-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .order-items {
+            border: 1px solid #ebeef5;
+            border-radius: 8px;
+            padding: 12px;
+            margin-top: 12px;
+        }
+
+        .order-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f5f7fa;
+        }
+
+        .order-item:last-child {
+            border-bottom: none;
+        }
+
+        .order-item img {
+            width: 56px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="page-container">
+                    <el-card class="search-card">
+                        <el-form :inline="true" :model="searchForm">
+                            <el-form-item label="订单号">
+                                <el-input v-model="searchForm.orderNo" placeholder="请输入订单号" clearable></el-input>
+                            </el-form-item>
+                            <el-form-item label="用户">
+                                <el-input v-model="searchForm.username" placeholder="请输入用户名" clearable></el-input>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="loadData">搜索</el-button>
+                                <el-button @click="resetSearch">重置</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </el-card>
+
+                    <el-card class="table-card">
+                        <div slot="header">
+                            <span>取消申请中的售后订单</span>
+                        </div>
+                        <el-table :data="tableData" v-loading="loading" stripe>
+                            <el-table-column prop="orderNo" label="订单号" min-width="180"></el-table-column>
+                            <el-table-column prop="username" label="用户" width="120"></el-table-column>
+                            <el-table-column prop="receiverName" label="收货人" width="120"></el-table-column>
+                            <el-table-column prop="receiverPhone" label="联系电话" width="140"></el-table-column>
+                            <el-table-column prop="payAmount" label="实付金额" width="120">
+                                <template slot-scope="scope">¥{{ scope.row.payAmount }}</template>
+                            </el-table-column>
+                            <el-table-column prop="updateTime" label="申请时间" min-width="160"></el-table-column>
+                            <el-table-column label="操作" width="220" fixed="right">
+                                <template slot-scope="scope">
+                                    <el-button type="text" @click="viewDetail(scope.row)">查看详情</el-button>
+                                    <el-button type="text" @click="openHandleDialog(scope.row)">售后处理</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </el-card>
+
+                    <el-dialog title="售后订单详情" :visible.sync="detailVisible" width="760px">
+                        <div v-if="currentOrder">
+                            <el-descriptions :column="2" border>
+                                <el-descriptions-item label="订单号">{{ currentOrder.orderNo }}</el-descriptions-item>
+                                <el-descriptions-item label="订单状态">{{ currentOrder.status }}</el-descriptions-item>
+                                <el-descriptions-item label="收货人">{{ currentOrder.receiverName }}</el-descriptions-item>
+                                <el-descriptions-item label="联系电话">{{ currentOrder.receiverPhone }}</el-descriptions-item>
+                                <el-descriptions-item label="实付金额">¥{{ currentOrder.payAmount }}</el-descriptions-item>
+                                <el-descriptions-item label="创建时间">{{ currentOrder.createTime }}</el-descriptions-item>
+                                <el-descriptions-item label="收货地址" :span="2">{{ currentOrder.address ? currentOrder.address.address : '' }}</el-descriptions-item>
+                                <el-descriptions-item label="售后回复" :span="2">{{ currentOrder.remark || '暂无回复' }}</el-descriptions-item>
+                            </el-descriptions>
+
+                            <div class="order-items">
+                                <div class="order-item" v-for="item in currentOrder.items || []" :key="item.id">
+                                    <img :src="item.image || '/static/image/profile.png'" alt="商品图片">
+                                    <div>
+                                        <div>{{ item.productName }}</div>
+                                        <div style="color:#909399;font-size:12px;">数量：{{ item.quantity }} | 单价：¥{{ item.price }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div slot="footer" class="dialog-footer">
+                            <el-button @click="detailVisible = false">关闭</el-button>
+                        </div>
+                    </el-dialog>
+
+                    <el-dialog title="售后处理" :visible.sync="handleVisible" width="520px">
+                        <el-form :model="handleForm" label-width="100px">
+                            <el-form-item label="处理结果">
+                                <el-radio-group v-model="handleForm.approve">
+                                    <el-radio :label="true">同意取消</el-radio>
+                                    <el-radio :label="false">驳回申请</el-radio>
+                                </el-radio-group>
+                            </el-form-item>
+                            <el-form-item label="处理回复">
+                                <el-input
+                                    v-model="handleForm.replyContent"
+                                    type="textarea"
+                                    :rows="4"
+                                    maxlength="200"
+                                    show-word-limit
+                                    placeholder="请输入售后处理回复">
+                                </el-input>
+                            </el-form-item>
+                        </el-form>
+                        <div slot="footer" class="dialog-footer">
+                            <el-button @click="handleVisible = false">取消</el-button>
+                            <el-button type="primary" :loading="submitting" @click="submitHandle">提交处理</el-button>
+                        </div>
+                    </el-dialog>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'community-after-sale',
+                    searchForm: {
+                        orderNo: '',
+                        username: ''
+                    },
+                    loading: false,
+                    tableData: [],
+                    detailVisible: false,
+                    handleVisible: false,
+                    submitting: false,
+                    currentOrder: null,
+                    handleForm: {
+                        id: null,
+                        approve: true,
+                        replyContent: ''
+                    }
+                };
+            },
+            mounted() {
+                this.loadData();
+            },
+            methods: {
+                loadData() {
+                    this.loading = true;
+                    axios.get('/api/mall/order/admin/cancel-requests')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                const rows = response.data.data || [];
+                                this.tableData = rows.filter(row => {
+                                    const hitOrder = !this.searchForm.orderNo || (row.orderNo || '').includes(this.searchForm.orderNo);
+                                    const hitUser = !this.searchForm.username || (row.username || '').includes(this.searchForm.username);
+                                    return hitOrder && hitUser;
+                                });
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载售后订单失败:', error);
+                            this.$message.error('加载售后订单失败');
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                        });
+                },
+                resetSearch() {
+                    this.searchForm = { orderNo: '', username: '' };
+                    this.loadData();
+                },
+                viewDetail(row) {
+                    axios.get(`/api/mall/order/${row.id}`)
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.currentOrder = response.data.data;
+                                this.detailVisible = true;
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载订单详情失败:', error);
+                            this.$message.error('加载订单详情失败');
+                        });
+                },
+                openHandleDialog(row) {
+                    this.handleForm = {
+                        id: row.id,
+                        approve: true,
+                        replyContent: ''
+                    };
+                    this.handleVisible = true;
+                },
+                submitHandle() {
+                    this.submitting = true;
+                    axios.post(`/api/mall/order/admin/${this.handleForm.id}/approve-cancel`, {
+                        approve: this.handleForm.approve,
+                        replyContent: this.handleForm.replyContent
+                    })
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.handleVisible = false;
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('售后处理失败:', error);
+                            this.$message.error('售后处理失败');
+                        })
+                        .finally(() => {
+                            this.submitting = false;
+                        });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

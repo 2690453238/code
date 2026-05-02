@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的订单</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .orders-page { background: #f7f0ef; min-height: 100vh; padding: 28px 5% 60px; }
+
+        /* 页头 */
+        .orders-page-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 24px; font-weight: 700; color: #1a0a08;
+            margin-bottom: 22px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .orders-page-title i { color: #e8a81a; }
+
+        /* 状态筛选标签栏 */
+        .status-tabs {
+            display: flex; gap: 6px; flex-wrap: wrap;
+            background: #fff;
+            border-radius: 14px;
+            padding: 12px 18px;
+            margin-bottom: 22px;
+            box-shadow: 0 2px 12px rgba(192,57,43,0.06);
+        }
+        .status-tab {
+            padding: 7px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            border: 1px solid #e8d5d4;
+            background: #fff;
+            color: #7d4040;
+            cursor: pointer;
+            transition: all .2s;
+            white-space: nowrap;
+        }
+        .status-tab:hover { border-color: #e8a81a; color: #e8a81a; }
+        .status-tab.active { background: #e8a81a; color: #fff; border-color: #e8a81a; font-weight: 600; }
+
+        /* 订单卡片 */
+        .order-card {
+            background: #fff;
+            border-radius: 16px;
+            margin-bottom: 18px;
+            box-shadow: 0 2px 14px rgba(192,57,43,0.07);
+            overflow: hidden;
+            transition: box-shadow .25s;
+        }
+        .order-card:hover { box-shadow: 0 6px 24px rgba(192,57,43,0.13); }
+
+        /* 卡片头部 */
+        .order-card-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 22px;
+            background: #fdf5f5;
+            border-bottom: 1px solid #f3e8e7;
+            flex-wrap: wrap; gap: 10px;
+        }
+        .order-head-left { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .order-no { font-size: 13px; color: #7d4040; font-weight: 600; }
+        .order-time { font-size: 12px; color: #b09090; }
+        .order-status-badge {
+            padding: 4px 14px; border-radius: 20px;
+            font-size: 12px; font-weight: 700; letter-spacing: .5px;
+        }
+        .badge-pending   { background: #fff8e6; color: #b8860b; border: 1px solid #f5d87a; }
+        .badge-paid      { background: #fdf1f0; color: #e8a81a; border: 1px solid #e8c4c0; }
+        .badge-shipped   { background: #f0fdf4; color: #059669; border: 1px solid #a7f3d0; }
+        .badge-delivered { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+        .badge-completed { background: #f4f4f5; color: #606266; border: 1px solid #dcdfe6; }
+        .badge-cancelled { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-cancel_requested { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
+
+        /* 步骤条 */
+        .order-steps {
+            display: flex; align-items: center;
+            padding: 14px 22px 6px;
+            overflow-x: auto; scrollbar-width: none;
+        }
+        .order-steps::-webkit-scrollbar { display: none; }
+        .step-item {
+            display: flex; flex-direction: column; align-items: center;
+            flex-shrink: 0; min-width: 64px;
+            font-size: 11px; color: #c0a0a0;
+        }
+        .step-dot {
+            width: 22px; height: 22px; border-radius: 50%;
+            border: 2px solid #e8d5d4;
+            background: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: #c0a0a0;
+            margin-bottom: 4px; transition: all .2s;
+        }
+        .step-item.done .step-dot  { background: #e8a81a; border-color: #e8a81a; color: #fff; }
+        .step-item.done            { color: #e8a81a; font-weight: 600; }
+        .step-line {
+            flex: 1; height: 2px; background: #e8d5d4;
+            margin: 0 4px; margin-bottom: 18px; min-width: 20px;
+            transition: background .2s;
+        }
+        .step-line.done { background: #e8a81a; }
+
+        /* 商品区 */
+        .order-items { padding: 10px 22px 0; }
+        .order-item {
+            display: flex; align-items: center;
+            padding: 12px 0; gap: 14px;
+            border-bottom: 1px solid #faf0ef;
+        }
+        .order-item:last-child { border-bottom: none; }
+        .item-img {
+            width: 64px; height: 64px;
+            border-radius: 10px; object-fit: cover;
+            border: 1px solid #f0e0df; flex-shrink: 0;
+        }
+        .item-info { flex: 1; min-width: 0; }
+        .item-name {
+            font-size: 14px; font-weight: 600; color: #1a0a08;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        .item-sku { font-size: 12px; color: #b09090; }
+        .item-review-done { font-size: 11px; color: #10b981; margin-top: 3px; }
+        .item-review-pending { font-size: 11px; color: #e8a81a; margin-top: 3px; cursor: pointer; }
+        .item-right { text-align: right; flex-shrink: 0; }
+        .item-price { font-size: 15px; font-weight: 700; color: #e8a81a; font-family: 'Noto Serif SC', serif; }
+        .item-qty { font-size: 12px; color: #b09090; margin-top: 2px; }
+
+        /* 物流信息 */
+        .shipping-bar {
+            margin: 0 22px 0;
+            background: #fdf5f5;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 13px; color: #7d4040;
+            display: flex; gap: 24px; flex-wrap: wrap;
+        }
+        .shipping-bar span { display: flex; align-items: center; gap: 5px; }
+        .shipping-bar i { color: #e8a81a; }
+
+        /* 卡片底部 */
+        .order-card-foot {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 22px;
+            border-top: 1px solid #faf0ef;
+            flex-wrap: wrap; gap: 12px;
+        }
+        .foot-total { font-size: 13px; color: #7d4040; }
+        .foot-total-price {
+            font-size: 20px; font-weight: 700; color: #e8a81a;
+            font-family: 'Noto Serif SC', serif;
+            margin-left: 6px;
+        }
+        .foot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn-action {
+            padding: 7px 18px; border-radius: 8px; font-size: 13px;
+            cursor: pointer; transition: all .2s; border: 1px solid;
+        }
+        .btn-outline {
+            background: #fff; color: #7d4040; border-color: #e8d5d4;
+        }
+        .btn-outline:hover { border-color: #e8a81a; color: #e8a81a; }
+        .btn-primary-red {
+            background: #e8a81a; color: #fff; border-color: #e8a81a;
+        }
+        .btn-primary-red:hover { background: #96281b; border-color: #96281b; }
+        .btn-danger {
+            background: #fff; color: #e8a81a; border-color: #e8c4c0;
+        }
+        .btn-danger:hover { background: #e8a81a; color: #fff; }
+
+        /* 空状态 */
+        .empty-orders {
+            background: #fff; border-radius: 16px;
+            text-align: center; padding: 80px 20px;
+            box-shadow: 0 2px 16px rgba(192,57,43,0.07);
+        }
+        .empty-orders i { font-size: 72px; color: #e0cece; display: block; margin-bottom: 20px; }
+        .empty-orders h3 { font-size: 18px; color: #7d4040; margin-bottom: 8px; font-family: 'Noto Serif SC', serif; }
+        .empty-orders p { font-size: 13px; color: #b09090; margin-bottom: 24px; }
+        .btn-go-shop {
+            padding: 12px 36px; background: #e8a81a; color: #fff;
+            border: none; border-radius: 30px; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: background .2s;
+        }
+        .btn-go-shop:hover { background: #96281b; }
+
+        /* 分页 */
+        .pagination-wrap { display: flex; justify-content: center; padding: 20px 0 10px; }
+        .el-pagination.is-background .el-pager li.active { background: #e8a81a !important; }
+        .el-pagination.is-background .el-pager li:hover { color: #e8a81a !important; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <front-layout :user-info="userInfo" active-menu="4">
+        <div class="orders-page">
+
+            <div class="orders-page-title">
+                <i class="el-icon-document"></i>
+                我的订单
+            </div>
+
+            <!-- 状态筛选标签栏 -->
+            <div class="status-tabs">
+                <div v-for="tab in statusTabs" :key="tab.value"
+                    class="status-tab" :class="{active: orderFilter.status === tab.value}"
+                    @click="switchStatus(tab.value)">
+                    {{ tab.label }}
+                </div>
+            </div>
+
+            <div v-loading="loading">
+
+                <!-- 空状态 -->
+                <div v-if="!loading && orders.length === 0" class="empty-orders">
+                    <i class="el-icon-document-remove"></i>
+                    <h3>暂无订单记录</h3>
+                    <p>快去挑选心仪的商品吧～</p>
+                    <button class="btn-go-shop" @click="goShopping">去购物</button>
+                </div>
+
+                <!-- 订单列表 -->
+                <div v-else>
+                    <div v-for="order in orders" :key="order.id" class="order-card">
+
+                        <!-- 卡片头 -->
+                        <div class="order-card-head">
+                            <div class="order-head-left">
+                                <span class="order-no"><i class="el-icon-document" style="margin-right:4px"></i>{{ order.orderNo }}</span>
+                                <span class="order-time">{{ formatDate(order.createTime) }}</span>
+                            </div>
+                            <span class="order-status-badge" :class="'badge-' + order.status">
+                                {{ getStatusText(order.status) }}
+                            </span>
+                        </div>
+
+                        <!-- 步骤条 -->
+                        <div class="order-steps">
+                            <template v-for="(step, idx) in getSteps(order.status)">
+                                <div class="step-item" :class="{done: step.done}" :key="'s'+idx">
+                                    <div class="step-dot">
+                                        <i v-if="step.done" class="el-icon-check"></i>
+                                        <span v-else>{{ idx+1 }}</span>
+                                    </div>
+                                    <span>{{ step.label }}</span>
+                                </div>
+                                <div v-if="idx < getSteps(order.status).length - 1"
+                                    class="step-line" :class="{done: step.done}" :key="'l'+idx"></div>
+                            </template>
+                        </div>
+
+                        <!-- 商品列表 -->
+                        <div class="order-items">
+                            <div v-for="item in order.items" :key="item.id" class="order-item">
+                                <img class="item-img" :src="item.productImage || '/static/image/no-image.png'" :alt="item.productName">
+                                <div class="item-info">
+                                    <div class="item-name">{{ item.productName }}</div>
+                                    <div v-if="item.skuName" class="item-sku">{{ item.skuName }}</div>
+                                    <div v-if="order.status === 'completed'">
+                                        <div v-if="item.isReviewed" class="item-review-done"><i class="el-icon-star-on"></i> 已评价</div>
+                                        <div v-else class="item-review-pending"><i class="el-icon-star-off"></i> 待评价</div>
+                                    </div>
+                                </div>
+                                <div class="item-right">
+                                    <div class="item-price">¥{{ item.price }}</div>
+                                    <div class="item-qty">x{{ item.quantity }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 物流信息 -->
+                        <div v-if="order.shippingInfo && ['shipped','delivered','completed'].includes(order.status)" style="padding: 10px 22px 0;">
+                            <div class="shipping-bar">
+                                <span><i class="el-icon-truck"></i>{{ order.shippingInfo.shippingCompany }}</span>
+                                <span><i class="el-icon-paperclip"></i>{{ order.shippingInfo.trackingNumber }}</span>
+                                <span v-if="order.shippingInfo.shippingTime"><i class="el-icon-time"></i>{{ formatDate(order.shippingInfo.shippingTime) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- 卡片底部 -->
+                        <div class="order-card-foot">
+                            <div class="foot-total">
+                                实付金额：<span class="foot-total-price">¥{{ order.payAmount }}</span>
+                            </div>
+                            <div class="foot-actions">
+                                <button class="btn-action btn-outline" @click="viewOrderDetail(order.id)">查看详情</button>
+                                <button v-if="order.status === 'pending'" class="btn-action btn-primary-red" @click="payOrder(order.id)">立即支付</button>
+                                <button v-if="order.status === 'pending'" class="btn-action btn-danger" @click="cancelOrder(order.id)">取消订单</button>
+                                <button v-if="['cancelled','completed','cancel_requested'].includes(order.status)" class="btn-action btn-danger" @click="deleteOrder(order.id)">删除订单</button>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 分页 -->
+                <div v-if="total > 0" class="pagination-wrap">
+                    <el-pagination
+                        background
+                        @size-change="handleSizeChange"
+                        @current-change="handleCurrentChange"
+                        :current-page="currentPage"
+                        :page-sizes="[5, 10, 20]"
+                        :page-size="pageSize"
+                        layout="total, sizes, prev, pager, next"
+                        :total="total">
+                    </el-pagination>
+                </div>
+
+            </div>
+        </div>
+    </front-layout>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/config/theme-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            userInfo: {},
+            orders: [],
+            loading: false,
+            orderFilter: { status: '' },
+            currentPage: 1,
+            pageSize: 10,
+            total: 0,
+            statusTabs: [
+                { label: '全部', value: '' },
+                { label: '待付款', value: 'pending' },
+                { label: '已付款', value: 'paid' },
+                { label: '已发货', value: 'shipped' },
+                { label: '已送达', value: 'delivered' },
+                { label: '已完成', value: 'completed' },
+                { label: '已取消', value: 'cancelled' }
+            ]
+        };
+    },
+    mounted() {
+        this.checkAuth();
+        this.loadOrders();
+    },
+    methods: {
+        checkAuth() {
+            const userInfo = localStorage.getItem('userInfo');
+            if (userInfo) {
+                this.userInfo = JSON.parse(userInfo);
+            } else {
+                this.$message.warning('请先登录');
+                window.location.href = '/login';
+            }
+        },
+        switchStatus(val) {
+            this.orderFilter.status = val;
+            this.currentPage = 1;
+            this.loadOrders();
+        },
+        async loadOrders() {
+            this.loading = true;
+            try {
+                const params = { page: this.currentPage, limit: this.pageSize };
+                if (this.orderFilter.status) params.status = this.orderFilter.status;
+                const response = await axios.get('/api/mall/order', { params });
+                if (response.data.code === 200) {
+                    this.orders = response.data.data.rows || [];
+                    this.total = response.data.data.total || 0;
+                } else {
+                    this.$message.error(response.data.message);
+                }
+            } catch (e) {
+                this.$message.error('加载订单列表失败');
+            } finally {
+                this.loading = false;
+            }
+        },
+        getStatusText(status) {
+            const map = {
+                pending: '待付款', paid: '已付款', shipped: '已发货',
+                delivered: '已送达', completed: '已完成',
+                cancelled: '已取消', cancel_requested: '取消申请中'
+            };
+            return map[status] || status;
+        },
+        getSteps(status) {
+            const allSteps = [
+                { label: '提交订单', statuses: ['pending','paid','shipped','delivered','completed'] },
+                { label: '付款成功', statuses: ['paid','shipped','delivered','completed'] },
+                { label: '商品发货', statuses: ['shipped','delivered','completed'] },
+                { label: '确认收货', statuses: ['delivered','completed'] },
+                { label: '交易完成', statuses: ['completed'] }
+            ];
+            if (status === 'cancelled' || status === 'cancel_requested') {
+                return [
+                    { label: '提交订单', done: true },
+                    { label: '已取消', done: true }
+                ];
+            }
+            return allSteps.map(s => ({ label: s.label, done: s.statuses.includes(status) }));
+        },
+        formatDate(dateStr) {
+            if (!dateStr) return '';
+            return new Date(dateStr).toLocaleString('zh-CN');
+        },
+        viewOrderDetail(orderId) {
+            window.open(`/front/mall/order-detail.html?id=${orderId}`, '_blank');
+        },
+        async payOrder(orderId) {
+            try {
+                const response = await axios.post(`/api/mall/order/${orderId}/pay`, { paymentMethod: 'alipay' });
+                if (response.data.code === 200) {
+                    this.$message.success('支付成功');
+                    this.loadOrders();
+                } else {
+                    this.$message.error(response.data.message);
+                }
+            } catch (e) {
+                this.$message.error('支付订单失败');
+            }
+        },
+        async cancelOrder(orderId) {
+            try {
+                await this.$confirm('确定要取消这个订单吗？', '提示', {
+                    confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+                });
+                const response = await axios.put(`/api/mall/order/${orderId}/cancel`);
+                if (response.data.code === 200) {
+                    this.$message.success('订单已取消');
+                    this.loadOrders();
+                } else {
+                    this.$message.error(response.data.message);
+                }
+            } catch (e) {
+                if (e !== 'cancel') this.$message.error('取消订单失败');
+            }
+        },
+        async deleteOrder(orderId) {
+            try {
+                await this.$confirm('确定要删除这个订单吗？删除后无法恢复！', '警告', {
+                    confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning'
+                });
+                const response = await axios.delete(`/api/mall/order/${orderId}`);
+                if (response.data.code === 200) {
+                    this.$message.success('订单删除成功');
+                    this.loadOrders();
+                } else {
+                    this.$message.error(response.data.message);
+                }
+            } catch (e) {
+                if (e !== 'cancel') this.$message.error('删除订单失败');
+            }
+        },
+        handleSizeChange(val) { this.pageSize = val; this.currentPage = 1; this.loadOrders(); },
+        handleCurrentChange(val) { this.currentPage = val; this.loadOrders(); },
+        goShopping() { window.location.href = '/front/mall/mall.html'; }
+    }
+});
+</script>
+</body>
+</html>

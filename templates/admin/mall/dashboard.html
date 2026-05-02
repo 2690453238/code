@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .dashboard-container {
+            padding: 20px;
+        }
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+        }
+        .stat-title {
+            color: #909399;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #303133;
+        }
+        .stat-icon {
+            float: right;
+            font-size: 40px;
+            color: #409eff;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :user-info="userInfo" active-menu="dashboard">
+            <template #content>
+                <div class="dashboard-container">
+                <h2>仪表盘</h2>
+                
+                <!-- 统计卡片 -->
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <div class="stat-title">商品总数</div>
+                        <div class="stat-value">{{ stats.productCount }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">订单总数</div>
+                        <div class="stat-value">{{ stats.orderCount }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">用户总数</div>
+                        <div class="stat-value">{{ stats.userCount }}</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">今日销售额</div>
+                        <div class="stat-value">¥{{ stats.todaySales }}</div>
+                    </div>
+                </div>
+
+                <!-- 快速操作 -->
+                <el-card>
+                    <div slot="header">
+                        <span>快速操作</span>
+                    </div>
+                    <el-row :gutter="20">
+                        <el-col :span="6">
+                            <el-button type="primary" @click="goToCategories">
+                                商品分类管理
+                            </el-button>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-button type="success" @click="goToProducts">
+                                商品管理
+                            </el-button>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-button type="warning" @click="goToOrders">
+                                订单管理
+                            </el-button>
+                        </el-col>
+                        <el-col :span="6">
+                            <el-button type="info" @click="goToUsers">
+                                用户管理
+                            </el-button>
+                        </el-col>
+                    </el-row>
+                </el-card>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app', 
+            data() {
+                return {
+                    userInfo: {},
+                    stats: {
+                        productCount: 0,
+                        orderCount: 0,
+                        userCount: 0,
+                        todaySales: 0
+                    }
+                }
+            },
+            mounted() {
+                this.checkAuth();
+                this.loadStats();
+            },
+            methods: {
+                // 检查登录状态
+                checkAuth() {
+                    const userInfo = localStorage.getItem('userInfo');
+                    if (userInfo) {
+                        this.userInfo = JSON.parse(userInfo); 
+                    } else {
+                        this.$message.warning('请先登录');
+                        window.location.href = '/login';
+                    }
+                },
+
+                // 加载统计数据
+                async loadStats() {
+                    try {
+                        // 这里可以调用API获取统计数据
+                        // 暂时使用模拟数据
+                        this.stats = {
+                            productCount: 156,
+                            orderCount: 89,
+                            userCount: 234,
+                            todaySales: 12345.67
+                        };
+                    } catch (error) {
+                        console.error('加载统计数据失败:', error);
+                    }
+                },
+
+                // 快速操作
+                goToCategories() {
+                    window.location.href = '/admin/mall-categories.html';
+                },
+                goToProducts() {
+                    window.location.href = '/admin/mall-products.html';
+                },
+                goToOrders() {
+                    window.location.href = '/admin/mall-orders.html';
+                },
+                goToUsers() {
+                    this.$message.info('用户管理功能待实现');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社区经营看板</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .stats-container {
+            padding: 20px;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            flex: 1;
+            min-width: 220px;
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .stat-card .title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .trend {
+            font-size: 12px;
+            color: #52c41a;
+        }
+
+        .stat-card.primary .value { color: #409eff; }
+        .stat-card.success .value { color: #67c23a; }
+        .stat-card.warning .value { color: #e6a23c; }
+        .stat-card.danger .value { color: #f56c6c; }
+
+        .chart-card {
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="stats-container">
+                    <h2 style="margin-bottom: 20px;">社区经营看板</h2>
+
+                    <div class="stats-row">
+                        <div class="stat-card primary">
+                            <div class="title">商品总数</div>
+                            <div class="value">{{ stats.productCount }}</div>
+                            <div class="trend">在售：{{ stats.onlineCount }} 件</div>
+                        </div>
+
+                        <div class="stat-card success">
+                            <div class="title">订单总数</div>
+                            <div class="value">{{ stats.orderCount }}</div>
+                            <div class="trend">待处理：{{ stats.pendingCount }} 单</div>
+                        </div>
+
+                        <div class="stat-card warning">
+                            <div class="title">总销售额</div>
+                            <div class="value">¥{{ stats.totalAmount }}</div>
+                            <div class="trend">本月：¥{{ stats.monthAmount }}</div>
+                        </div>
+
+                        <div class="stat-card danger">
+                            <div class="title">库存预警</div>
+                            <div class="value">{{ stats.lowStockCount }}</div>
+                            <div class="trend">需要补货的商品</div>
+                        </div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title">近期订单趋势</div>
+                        <el-empty v-if="!trendData.dates.length && !trendLoading" description="暂无数据"></el-empty>
+                        <div id="orderTrendChart" style="height: 320px;" v-show="trendData.dates.length || trendLoading" v-loading="trendLoading"></div>
+                    </div>
+
+                    <div class="chart-card">
+                        <div class="chart-title">热销商品 TOP 10</div>
+                        <el-table :data="topProducts" style="width: 100%">
+                            <el-table-column prop="name" label="商品名称" min-width="200"></el-table-column>
+                            <el-table-column prop="sales" label="销量" width="120"></el-table-column>
+                            <el-table-column prop="stock" label="库存" width="120"></el-table-column>
+                            <el-table-column prop="price" label="价格" width="120">
+                                <template slot-scope="scope">
+                                    ¥{{ scope.row.price }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="状态" width="100">
+                                <template slot-scope="scope">
+                                    <el-tag :type="scope.row.status === 1 ? 'success' : 'info'" size="small">
+                                        {{ scope.row.status === 1 ? '在售' : '下架' }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+                    </div>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/echarts.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'community-analysis',
+                    stats: {
+                        productCount: 0,
+                        onlineCount: 0,
+                        orderCount: 0,
+                        pendingCount: 0,
+                        totalAmount: 0,
+                        monthAmount: 0,
+                        lowStockCount: 0
+                    },
+                    topProducts: [],
+                    trendLoading: false,
+                    trendData: {
+                        dates: [],
+                        orderCounts: [],
+                        revenues: []
+                    },
+                    orderTrendChart: null
+                };
+            },
+            mounted() {
+                this.loadStats();
+                this.loadTopProducts();
+                this.$nextTick(() => {
+                    this.initTrendChart();
+                    this.loadOrderTrend();
+                    this.scheduleChartResize();
+                });
+            },
+            methods: {
+                scheduleChartResize() {
+                    const resizeChart = () => {
+                        if (this.orderTrendChart) {
+                            this.orderTrendChart.resize();
+                        }
+                    };
+                    requestAnimationFrame(() => {
+                        resizeChart();
+                        setTimeout(resizeChart, 80);
+                        setTimeout(resizeChart, 220);
+                        setTimeout(resizeChart, 400);
+                    });
+                },
+                initTrendChart() {
+                    const dom = document.getElementById('orderTrendChart');
+                    if (!dom) {
+                        return;
+                    }
+                    if (this.orderTrendChart) {
+                        this.orderTrendChart.dispose();
+                    }
+                    this.orderTrendChart = echarts.init(dom);
+                    window.addEventListener('resize', () => {
+                        if (this.orderTrendChart) {
+                            this.orderTrendChart.resize();
+                        }
+                    });
+                    this.scheduleChartResize();
+                },
+                loadStats() {
+                    axios.get('/api/supplier/stats')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.stats = response.data.data;
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载统计数据失败:', error);
+                            this.$message.error('加载统计数据失败');
+                        });
+                },
+                loadTopProducts() {
+                    axios.get('/api/supplier/top-products')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.topProducts = response.data.data;
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载热销商品失败:', error);
+                            this.$message.error('加载热销商品失败');
+                        });
+                },
+                loadOrderTrend() {
+                    this.trendLoading = true;
+                    axios.get('/api/supplier/order-trend', {
+                        params: { days: 30 }
+                    })
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.trendData = response.data.data || { dates: [], orderCounts: [], revenues: [] };
+                                this.$nextTick(() => {
+                                    this.renderTrendChart();
+                                    this.scheduleChartResize();
+                                });
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载订单趋势失败:', error);
+                            this.$message.error('加载订单趋势失败');
+                        })
+                        .finally(() => {
+                            this.trendLoading = false;
+                        });
+                },
+                renderTrendChart() {
+                    if (!this.orderTrendChart) {
+                        this.initTrendChart();
+                    }
+                    if (!this.orderTrendChart) {
+                        return;
+                    }
+                    this.orderTrendChart.setOption({
+                        tooltip: { trigger: 'axis' },
+                        legend: { data: ['订单数', '销售额'] },
+                        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                        xAxis: {
+                            type: 'category',
+                            data: this.trendData.dates || []
+                        },
+                        yAxis: [
+                            { type: 'value', name: '订单数' },
+                            { type: 'value', name: '销售额' }
+                        ],
+                        series: [
+                            {
+                                name: '订单数',
+                                type: 'bar',
+                                data: this.trendData.orderCounts || [],
+                                itemStyle: { color: '#409eff' }
+                            },
+                            {
+                                name: '销售额',
+                                type: 'line',
+                                smooth: true,
+                                yAxisIndex: 1,
+                                data: this.trendData.revenues || [],
+                                itemStyle: { color: '#67c23a' }
+                            }
+                        ]
+                    }, true);
+                    this.scheduleChartResize();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

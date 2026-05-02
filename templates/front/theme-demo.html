@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主题配色演示 - 管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+</head>
+<body>
+    <div id="app">
+        <front-layout :active-menu="activeMenu">
+            <div class="page-container">
+                <!-- 页面标题 -->
+                <div class="page-header">
+                    <h2>主题配色演示</h2>
+                    <p>体验不同的配色方案，选择您喜欢的主题风格</p>
+                </div>
+
+                <!-- 当前主题信息 -->
+                <el-card class="current-theme-card">
+                    <div slot="header" class="card-header">
+                        <span>当前主题</span>
+                        <theme-switcher></theme-switcher>
+                    </div>
+                    <div class="current-theme-info">
+                        <div class="theme-name">{{ currentThemeName }}</div>
+                        <div class="theme-colors">
+                            <div class="color-item">
+                                <div class="color-label">主色调</div>
+                                <div class="color-preview" :style="{ backgroundColor: getCurrentThemeColor('primary') }"></div>
+                                <div class="color-value">{{ getCurrentThemeColor('primary') }}</div>
+                            </div>
+                            <div class="color-item">
+                                <div class="color-label">辅助色</div>
+                                <div class="color-preview" :style="{ backgroundColor: getCurrentThemeColor('secondary') }"></div>
+                                <div class="color-value">{{ getCurrentThemeColor('secondary') }}</div>
+                            </div>
+                            <div class="color-item">
+                                <div class="color-label">成功色</div>
+                                <div class="color-preview" :style="{ backgroundColor: getCurrentThemeColor('success') }"></div>
+                                <div class="color-value">{{ getCurrentThemeColor('success') }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+
+                <!-- 主题选择面板 -->
+                <el-card class="theme-selection-card">
+                    <div slot="header" class="card-header">
+                        <span>选择主题</span>
+                        <el-button type="text" @click="refreshThemes">
+                            <i class="el-icon-refresh"></i> 刷新
+                        </el-button>
+                    </div>
+                    <div class="theme-grid">
+                        <div 
+                            v-for="theme in availableThemes"
+                            :key="theme.key"
+                            class="theme-item"
+                            :class="{ 'is-active': currentTheme === theme.key }"
+                            @click="switchTheme(theme.key)">
+                            <div class="theme-item-header">
+                                <div class="theme-item-name">{{ theme.name }}</div>
+                                <i class="el-icon-check" v-if="currentTheme === theme.key"></i>
+                            </div>
+                            <div class="theme-item-colors">
+                                <div 
+                                    class="theme-item-color"
+                                    :style="{ backgroundColor: getThemeColor(theme.key, 'primary') }">
+                                </div>
+                                <div 
+                                    class="theme-item-color"
+                                    :style="{ backgroundColor: getThemeColor(theme.key, 'secondary') }">
+                                </div>
+                                <div 
+                                    class="theme-item-color"
+                                    :style="{ backgroundColor: getThemeColor(theme.key, 'success') }">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+
+                <!-- 主题效果预览 -->
+                <el-card class="theme-preview-card">
+                    <div slot="header" class="card-header">
+                        <span>主题效果预览</span>
+                    </div>
+                    <div class="preview-content">
+                        <!-- 按钮预览 -->
+                        <div class="preview-section">
+                            <h4>按钮样式</h4>
+                            <div class="button-group">
+                                <el-button type="primary">主要按钮</el-button>
+                                <el-button type="success">成功按钮</el-button>
+                                <el-button type="warning">警告按钮</el-button>
+                                <el-button type="danger">危险按钮</el-button>
+                                <el-button type="info">信息按钮</el-button>
+                            </div>
+                        </div>
+
+                        <!-- 卡片预览 -->
+                        <div class="preview-section">
+                            <h4>卡片样式</h4>
+                            <div class="card-group">
+                                <div class="preview-card">
+                                    <div class="preview-card-header">
+                                        <h5>示例卡片</h5>
+                                        <span class="preview-badge">新</span>
+                                    </div>
+                                    <div class="preview-card-content">
+                                        <p>这是一个示例卡片，展示了当前主题的卡片样式效果。</p>
+                                        <div class="preview-meta">
+                                            <span class="preview-time">2024-01-01</span>
+                                            <span class="preview-author">管理员</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 表单预览 -->
+                        <div class="preview-section">
+                            <h4>表单样式</h4>
+                            <div class="form-group">
+                                <el-input placeholder="请输入内容" v-model="demoInput"></el-input>
+                                <el-select placeholder="请选择" v-model="demoSelect">
+                                    <el-option label="选项1" value="1"></el-option>
+                                    <el-option label="选项2" value="2"></el-option>
+                                </el-select>
+                                <el-date-picker v-model="demoDate" placeholder="选择日期"></el-date-picker>
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+            </div>
+        </front-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script src="/static/js/config/theme-config.js"></script> 
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: '2',
+                    currentTheme: 'default',
+                    availableThemes: [],
+                    demoInput: '',
+                    demoSelect: '',
+                    demoDate: ''
+                }
+            },
+            computed: {
+                currentThemeName() {
+                    const theme = this.availableThemes.find(t => t.key === this.currentTheme);
+                    return theme ? theme.name : '默认主题';
+                }
+            },
+            mounted() {
+                this.initTheme();
+                this.loadAvailableThemes();
+                
+                // 监听主题变更事件
+                window.addEventListener('themeChanged', this.handleThemeChanged);
+            },
+            beforeDestroy() {
+                window.removeEventListener('themeChanged', this.handleThemeChanged);
+            },
+            methods: {
+                initTheme() {
+                    this.currentTheme = window.themeManager ? window.themeManager.getCurrentTheme() : 'default';
+                },
+                loadAvailableThemes() {
+                    if (window.themeManager) {
+                        this.availableThemes = window.themeManager.getAvailableThemes();
+                    }
+                },
+                handleThemeChanged(event) {
+                    this.currentTheme = event.detail.theme;
+                },
+                switchTheme(themeKey) {
+                    if (window.themeManager) {
+                        window.themeManager.switchTheme(themeKey);
+                        this.currentTheme = themeKey;
+                        this.$message.success(`已切换到${this.getThemeName(themeKey)}`);
+                    }
+                },
+                getThemeName(themeKey) {
+                    const theme = this.availableThemes.find(t => t.key === themeKey);
+                    return theme ? theme.name : themeKey;
+                },
+                getCurrentThemeColor(colorKey) {
+                    return this.getThemeColor(this.currentTheme, colorKey);
+                },
+                getThemeColor(themeKey, colorKey) {
+                    const colorMap = {
+                        'default': { primary: '#667eea', secondary: '#764ba2', success: '#10b981' },
+                        'green': { primary: '#10b981', secondary: '#059669', success: '#10b981' },
+                        'orange': { primary: '#f59e0b', secondary: '#d97706', success: '#10b981' },
+                        'purple': { primary: '#8b5cf6', secondary: '#7c3aed', success: '#10b981' },
+                        'business': { primary: '#2563eb', secondary: '#1d4ed8', success: '#10b981' },
+                        'minimal': { primary: '#6b7280', secondary: '#4b5563', success: '#10b981' }
+                    };
+                    return colorMap[themeKey] ? colorMap[themeKey][colorKey] : '#667eea';
+                },
+                refreshThemes() {
+                    this.loadAvailableThemes();
+                    this.$message.success('主题列表已刷新');
+                }
+            }
+        });
+    </script>
+
+    <style scoped>
+        .current-theme-card {
+            margin-bottom: 20px;
+        }
+
+        .current-theme-info {
+            text-align: center;
+        }
+
+        .theme-name {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--theme-text);
+            margin-bottom: 20px;
+        }
+
+        .theme-colors {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .color-item {
+            text-align: center;
+        }
+
+        .color-label {
+            font-size: 14px;
+            color: var(--theme-textLight);
+            margin-bottom: 8px;
+        }
+
+        .color-preview {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .color-value {
+            font-size: 12px;
+            color: var(--theme-textLighter);
+            font-family: 'Courier New', monospace;
+        }
+
+        .theme-selection-card {
+            margin-bottom: 20px;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .theme-item {
+            padding: 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .theme-item:hover {
+            background: rgba(255, 255, 255, 0.8);
+            border-color: rgba(102, 126, 234, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .theme-item.is-active {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: var(--theme-primary);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+        }
+
+        .theme-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .theme-item-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--theme-text);
+        }
+
+        .theme-item-colors {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .theme-item-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .theme-preview-card {
+            margin-bottom: 20px;
+        }
+
+        .preview-content {
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .preview-section h4 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--theme-text);
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .card-group {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .preview-card {
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            min-width: 250px;
+        }
+
+        .preview-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .preview-card-header h5 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--theme-text);
+            margin: 0;
+        }
+
+        .preview-badge {
+            background: var(--theme-primary);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .preview-card-content p {
+            color: var(--theme-textLight);
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .preview-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 12px;
+            color: var(--theme-textLighter);
+        }
+
+        .form-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .form-group .el-input,
+        .form-group .el-select,
+        .form-group .el-date-picker {
+            min-width: 200px;
+        }
+
+        @media (max-width: 768px) {
+            .theme-colors {
+                gap: 20px;
+            }
+
+            .theme-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .card-group {
+                flex-direction: column;
+            }
+
+            .form-group {
+                flex-direction: column;
+            }
+
+            .form-group .el-input,
+            .form-group .el-select,
+            .form-group .el-date-picker {
+                width: 100%;
+            }
+        }
+    </style>
+</body>
+</html>

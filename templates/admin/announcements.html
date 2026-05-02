@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新闻公告管理 - 后台管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <!-- Quill.js 富文本编辑器 -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <!-- 富文本编辑器组件样式 -->
+    <link rel="stylesheet" href="/static/css/rich-editor.css">
+    <!-- 富文本编辑器组件 -->
+    <script src="/static/js/components/rich-editor.js"></script>
+    <style>
+        .page-container {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e6e6e6;
+        }
+        .page-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .search-card {
+            margin-bottom: 20px;
+        }
+        .table-card {
+            margin-bottom: 20px;
+        }
+        .pagination-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .title-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .top-tag {
+            background: #f56c6c;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .form-tip {
+            margin-left: 10px;
+            color: #999;
+            font-size: 12px;
+        }
+        
+        /* 禁用Quill默认的图片处理 */
+        .ql-toolbar .ql-image {
+            pointer-events: auto !important;
+        }
+         
+        
+        /* 操作按钮样式 */
+        .el-table .el-button--mini {
+            margin: 0 2px;
+        }
+        
+        .el-dropdown {
+            margin-left: 5px;
+        }
+        
+        .el-dropdown .el-button--text {
+            color: #606266;
+            padding: 5px 8px;
+        }
+        
+        .el-dropdown .el-button--text:hover {
+            color: #409EFF;
+            background-color: #ecf5ff;
+        }
+        
+        /* 详情弹窗样式 */
+        .announcement-detail-alert .el-message-box__content {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .announcement-detail-alert .el-message-box {
+            width: 600px;
+            max-width: 90vw;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="page-container">
+                <!-- 页面标题 -->
+                <div class="page-header">
+                    <h2>新闻公告管理</h2>
+                    <div class="page-actions">
+                        <el-button type="primary" @click="showCreateDialog">
+                            <i class="el-icon-plus"></i> 新增公告
+                        </el-button>
+                    </div>
+                </div>
+
+                <!-- 搜索筛选区域 -->
+                <el-card class="search-card">
+                    <el-form :inline="true" :model="searchForm" class="search-form">
+                        <el-form-item label="关键词">
+                            <el-input 
+                                v-model="searchForm.keyword" 
+                                placeholder="请输入标题或内容关键词"
+                                clearable
+                                @keyup.enter.native="handleSearch">
+                            </el-input>
+                        </el-form-item>
+                        <el-form-item label="状态">
+                            <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
+                                <el-option label="全部" value=""></el-option>
+                                <el-option label="已发布" :value="1"></el-option>
+                                <el-option label="草稿" :value="0"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="handleSearch">
+                                <i class="el-icon-search"></i> 搜索
+                            </el-button>
+                            <el-button @click="handleReset">
+                                <i class="el-icon-refresh"></i> 重置
+                            </el-button>
+                        </el-form-item>
+                    </el-form>
+                </el-card>
+
+                <!-- 数据表格 -->
+                <el-card class="table-card">
+                    <el-table 
+                        :data="tableData" 
+                        v-loading="loading"
+                        stripe
+                        style="width: 100%">
+                        <el-table-column prop="id" label="ID" width="80" align="center"></el-table-column>
+                        <el-table-column prop="title" label="标题"  show-overflow-tooltip>
+                            <template slot-scope="scope">
+                                <div class="title-cell">
+                                    <span v-if="scope.row.isTop" class="top-tag">置顶</span>
+                                    <span>{{ scope.row.title }}</span>
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="summary" label="摘要" min-width="250" show-overflow-tooltip>
+                            <template slot-scope="scope">
+                                <div class="summary-cell">
+                                    {{ scope.row.summary || '暂无摘要' }}
+                                </div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="author" label="发布人" align="center"></el-table-column>
+                        <el-table-column prop="status" label="状态" align="center">
+                            <template slot-scope="scope">
+                                <el-tag :type="scope.row.status === 1 ? 'success' : 'info'" size="small">
+                                    {{ scope.row.status === 1 ? '已发布' : '草稿' }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <!-- <el-table-column prop="viewCount" label="浏览次数" align="center"></el-table-column> -->
+                        <!-- <el-table-column prop="createTime" label="创建时间" align="center"></el-table-column> -->
+                        <el-table-column label="操作" align="center" fixed="right" width="300">
+                            <template slot-scope="scope">
+                                <el-button size="mini" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+                                <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+                                <el-dropdown @command="(command) => handleDropdownCommand(command, scope.row)" trigger="click">
+                                    <el-button size="mini" type="text">
+                                        更多<i class="el-icon-arrow-down el-icon--right"></i>
+                                    </el-button>
+                                    <el-dropdown-menu slot="dropdown">
+                                        <el-dropdown-item 
+                                            :command="scope.row.status === 1 ? 'unpublish' : 'publish'"
+                                            :icon="scope.row.status === 1 ? 'el-icon-video-pause' : 'el-icon-video-play'">
+                                            {{ scope.row.status === 1 ? '下架' : '发布' }}
+                                        </el-dropdown-item>
+                                        <el-dropdown-item 
+                                            :command="scope.row.isTop === 1 ? 'untop' : 'top'"
+                                            :icon="scope.row.isTop === 1 ? 'el-icon-bottom' : 'el-icon-top'">
+                                            {{ scope.row.isTop === 1 ? '取消置顶' : '置顶' }}
+                                        </el-dropdown-item>
+                                        <!-- <el-dropdown-item command="view" icon="el-icon-view">查看详情</el-dropdown-item> -->
+                                    </el-dropdown-menu>
+                                </el-dropdown>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <!-- 分页 -->
+                    <div class="pagination-container">
+                        <el-pagination
+                            @size-change="handleSizeChange"
+                            @current-change="handleCurrentChange"
+                            :current-page="pagination.pageNum"
+                            :page-sizes="[10, 20, 50, 100]"
+                            :page-size="pagination.pageSize"
+                            layout="total, sizes, prev, pager, next, jumper"
+                            :total="pagination.total">
+                        </el-pagination>
+                    </div>
+                </el-card>
+            </div>
+
+            <!-- 新增/编辑对话框 -->
+            <el-dialog 
+                :title="dialogTitle" 
+                :visible.sync="dialogVisible" 
+                width="50%"
+                :close-on-click-modal="false">
+                <el-form 
+                    :model="formData" 
+                    :rules="formRules" 
+                    ref="formRef" 
+                    label-width="100px">
+                    <el-form-item label="公告标题" prop="title">
+                        <el-input 
+                            v-model="formData.title" 
+                            placeholder="请输入公告标题"
+                            maxlength="200"
+                            show-word-limit>
+                        </el-input>
+                    </el-form-item>
+                    
+                    <el-form-item label="公告摘要" prop="summary">
+                        <el-input 
+                            v-model="formData.summary" 
+                            type="textarea" 
+                            :rows="3"
+                            placeholder="请输入公告摘要（用于列表展示，建议100-200字）" 
+                            maxlength="500" 
+                            show-word-limit>
+                        </el-input>
+                        <div class="form-tip" style="color: #909399; font-size: 12px; margin-top: 5px;">
+                            摘要将显示在公告列表中，建议简洁明了地概括公告要点。如果包含图片，建议在摘要中简要描述图片内容。
+                        </div>
+                    </el-form-item>
+                    
+                    <el-form-item label="公告内容" prop="content">
+                        <div id="content-editor" style="height: 300px;"></div>
+                    </el-form-item>
+                    <el-form-item label="发布状态">
+                        <el-radio-group v-model="formData.status">
+                            <el-radio :label="1">立即发布</el-radio>
+                            <el-radio :label="0">保存为草稿</el-radio>
+                        </el-radio-group>
+                    </el-form-item>
+                    <el-form-item label="置顶设置">
+                        <el-switch 
+                            v-model="formData.isTop" 
+                            :active-value="1" 
+                            :inactive-value="0">
+                        </el-switch>
+                        <span class="form-tip">开启后该公告将显示在列表顶部</span>
+                    </el-form-item>
+                </el-form>
+                <div slot="footer" class="dialog-footer">
+                    <el-button @click="dialogVisible = false">取消</el-button>
+                    <el-button type="primary" @click="handleSubmit" :loading="submitLoading">确定</el-button>
+                </div>
+            </el-dialog>
+            </template>
+        </admin-layout>
+    </div>
+ 
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'announcements',
+                    loading: false,
+                    submitLoading: false,
+                    dialogVisible: false,
+                    dialogTitle: '新增公告',
+                    isEdit: false,
+                    tableData: [],
+                    searchForm: {
+                        keyword: '',
+                        status: ''
+                    },
+                    pagination: {
+                        pageNum: 1,
+                        pageSize: 10,
+                        total: 0
+                    },
+                    richEditor: null, // 富文本编辑器组件实例
+                    formData: {
+                        id: null,
+                        title: '',
+                        summary: '',
+                        content: '',
+                        status: 1,
+                        isTop: 0
+                    },
+                    formRules: {
+                        title: [
+                            { required: true, message: '请输入公告标题', trigger: 'blur' },
+                            { min: 1, max: 200, message: '标题长度在 1 到 200 个字符', trigger: 'blur' }
+                        ],
+                        summary: [
+                            { required: true, message: '请输入公告摘要', trigger: 'blur' },
+                            { min: 10, max: 500, message: '摘要长度在 10 到 500 个字符', trigger: 'blur' }
+                        ],
+                        content: [
+                            { required: true, message: '请输入公告内容', trigger: 'blur' },
+                            { 
+                                validator: (rule, value, callback) => {
+                                    if (!value) {
+                                        callback(new Error('请输入公告内容'));
+                                        return;
+                                    }
+                                    
+                                    // 获取纯文本内容进行长度验证
+                                    const textContent = this.richEditor ? this.richEditor.getContent('text') : '';
+                                    if (textContent.length < 1 || textContent.length > 2000) {
+                                        callback(new Error('内容长度在 1 到 2000 个字符'));
+                                        return;
+                                    }
+                                    
+                                    callback();
+                                }, 
+                                trigger: 'blur' 
+                            }
+                        ]
+                    }
+                }
+            },
+            mounted() {
+                console.log('公告管理页面已挂载');
+                this.loadData();
+                this.initRichEditor();
+            },
+            methods: {
+                // 加载数据
+                loadData() {
+                    console.log('开始加载数据...');
+                    this.loading = true;
+                    const params = {
+                        pageNum: this.pagination.pageNum,
+                        pageSize: this.pagination.pageSize,
+                        keyword: this.searchForm.keyword,
+                        status: this.searchForm.status
+                    };
+                    
+                    console.log('请求参数:', params);
+                    console.log('请求URL:', '/api/announcement/admin/list');
+                    
+                    axios.get('/api/announcement/admin/list', { params })
+                        .then(response => {
+                            console.log('API响应:', response.data);
+                            if (response.data.code === 200) {
+                                this.tableData = response.data.data.rows;
+                                this.pagination.total = response.data.data.total;
+                                console.log('数据加载成功:', this.tableData);
+                            } else {
+                                console.error('API返回错误:', response.data.message);
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载数据失败:', error);
+                            this.$message.error('加载数据失败');
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                            console.log('数据加载完成');
+                        });
+                },
+
+                // 搜索
+                handleSearch() {
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                // 重置搜索
+                handleReset() {
+                    this.searchForm = {
+                        keyword: '',
+                        status: ''
+                    };
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                // 分页大小改变
+                handleSizeChange(val) {
+                    this.pagination.pageSize = val;
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                // 当前页改变
+                handleCurrentChange(val) {
+                    this.pagination.pageNum = val;
+                    this.loadData();
+                },
+
+                // 显示新增对话框
+                showCreateDialog() {
+                    this.dialogTitle = '新增公告';
+                    this.isEdit = false;
+                    this.formData = {
+                        id: null,
+                        title: '',
+                        content: '',
+                        status: 1,
+                        isTop: 0
+                    };
+                    this.dialogVisible = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.formRef) {
+                            this.$refs.formRef.clearValidate();
+                        }
+                        // 初始化富文本编辑器（如果不存在）
+                        this.ensureRichEditor();
+                        // 延迟清空内容，确保编辑器已初始化
+                        setTimeout(() => {
+                            this.setEditorContent('');
+                        }, 100);
+                    });
+                },
+
+                // 编辑
+                handleEdit(row) {
+                    this.dialogTitle = '编辑公告';
+                    this.isEdit = true;
+                    this.formData = {
+                        id: row.id,
+                        title: row.title,
+                        summary: row.summary || '',
+                        content: row.content,
+                        status: row.status,
+                        isTop: row.isTop
+                    };
+                    this.dialogVisible = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.formRef) {
+                            this.$refs.formRef.clearValidate();
+                        }
+                        // 初始化富文本编辑器（如果不存在）
+                        this.ensureRichEditor();
+                        // 延迟设置内容，确保编辑器已初始化
+                        setTimeout(() => {
+                            this.setEditorContent(row.content);
+                        }, 100);
+                    });
+                },
+
+                // 提交表单
+                handleSubmit() {
+                    if (!this.$refs.formRef) {
+                        this.$message.error('表单未准备好');
+                        return;
+                    }
+                    
+                    // 获取富文本编辑器内容
+                    this.formData.content = this.richEditor ? this.richEditor.getContent() : '';
+                    
+                    // 获取纯文本内容用于长度验证
+                    const textContent = this.richEditor ? this.richEditor.getContent('text') : '';
+                    
+                    // 验证内容不为空
+                    if (!this.formData.content || this.formData.content.trim() === '' || this.formData.content === '<p><br></p>') {
+                        this.$message.error('请输入公告内容');
+                        return;
+                    }
+                    
+                    // 验证纯文本长度
+                    if (textContent.length < 1 || textContent.length > 2000) {
+                        this.$message.error('内容长度在 1 到 2000 个字符');
+                        return;
+                    }
+                    
+                    this.$refs.formRef.validate((valid) => {
+                        if (valid) {
+                            this.submitLoading = true;
+                            const url = this.isEdit ? '/api/announcement/admin/update' : '/api/announcement/admin/create';
+                            const data = { ...this.formData };
+                            
+                            axios.post(url, data)
+                                .then(response => {
+                                    if (response.data.code === 200) {
+                                        this.$message.success(response.data.message);
+                                        this.dialogVisible = false;
+                                        this.loadData();
+                                    } else {
+                                        this.$message.error(response.data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('提交失败:', error);
+                                    this.$message.error('提交失败');
+                                })
+                                .finally(() => {
+                                    this.submitLoading = false;
+                                });
+                        }
+                    });
+                },
+
+                // 切换状态
+                handleToggleStatus(row) {
+                    const action = row.status === 1 ? '下架' : '发布';
+                    this.$confirm(`确定要${action}该公告吗？`, '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        axios.get('/api/announcement/admin/toggle-status', {
+                            params: { id: row.id }
+                        }).then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        }).catch(error => {
+                            console.error('操作失败:', error);
+                            this.$message.error('操作失败');
+                        });
+                    });
+                },
+
+                // 切换置顶
+                handleToggleTop(row) {
+                    const action = row.isTop === 1 ? '取消置顶' : '置顶';
+                    this.$confirm(`确定要${action}该公告吗？`, '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        axios.get('/api/announcement/admin/toggle-top', {
+                            params: { id: row.id }
+                        }).then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        }).catch(error => {
+                            console.error('操作失败:', error);
+                            this.$message.error('操作失败');
+                        });
+                    });
+                },
+
+                // 删除
+                handleDelete(row) {
+                    this.$confirm('确定要删除该公告吗？删除后不可恢复！', '警告', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'error'
+                    }).then(() => {
+                        axios.get('/api/announcement/admin/delete', {
+                            params: { id: row.id }
+                        }).then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        }).catch(error => {
+                            console.error('删除失败:', error);
+                            this.$message.error('删除失败');
+                        });
+                    });
+                },
+
+                // 确保富文本编辑器存在（避免重复初始化）
+                ensureRichEditor() {
+                    if (!this.richEditor) {
+                        this.initRichEditor();
+                    }
+                },
+
+                // 配置图片上传处理器
+                setupImageUpload() {
+                    if (!this.richEditor || !this.richEditor.getEditor()) return;
+
+                    // 获取工具栏中的图片按钮
+                    const quillEditor = this.richEditor.getEditor();
+                    const toolbar = quillEditor.getModule('toolbar');
+                    const imageButton = toolbar.container.querySelector('.ql-image');
+                    
+                    if (imageButton && !imageButton.hasAttribute('data-upload-configured')) {
+                        // 标记已配置，避免重复配置
+                        imageButton.setAttribute('data-upload-configured', 'true');
+                        
+                        // 清理可能存在的旧文件输入元素
+                        const existingFileInputs = document.querySelectorAll('#quill-image-upload');
+                        existingFileInputs.forEach(input => input.remove());
+                        
+                        // 创建文件输入元素
+                        const fileInput = document.createElement('input');
+                        fileInput.setAttribute('type', 'file');
+                        fileInput.setAttribute('accept', 'image/*');
+                        fileInput.setAttribute('id', 'quill-image-upload');
+                        fileInput.style.display = 'none';
+                        
+                        // 完全替换图片按钮，移除所有默认行为
+                        const newImageButton = document.createElement('button');
+                        // newImageButton.className = 'ql-image';
+                        newImageButton.type = 'button';
+                         
+                        // 替换原按钮
+                        imageButton.parentNode.replaceChild(newImageButton, imageButton);
+                        
+                        // 添加自定义点击事件
+                        newImageButton.addEventListener('click', (e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            e.stopImmediatePropagation();
+                            // 直接触发文件输入
+                            fileInput.click();
+                        });
+
+                        // 处理文件选择
+                        fileInput.addEventListener('change', (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                this.uploadImage(file);
+                            }
+                            // 清空文件输入，允许重复选择同一文件
+                            fileInput.value = '';
+                        });
+
+                        // 将文件输入添加到页面
+                        document.body.appendChild(fileInput);
+                        
+                        console.log('图片上传处理器配置完成');
+                    }
+                },
+
+                // 上传图片到服务器
+                uploadImage(file) {
+                    // 验证编辑器是否已初始化
+                    if (!this.richEditor || !this.richEditor.getEditor()) {
+                        this.$message.error('编辑器未初始化，请稍后重试');
+                        return;
+                    }
+
+                    // 验证文件类型
+                    if (!file.type.startsWith('image/')) {
+                        this.$message.error('请选择图片文件');
+                        return;
+                    }
+
+                    // 验证文件大小（限制为5MB）
+                    if (file.size > 5 * 1024 * 1024) {
+                        this.$message.error('图片大小不能超过5MB');
+                        return;
+                    }
+
+                    // 创建FormData
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    // 显示上传进度
+                    this.$message.info('正在上传图片...');
+
+                    // 发送上传请求
+                    fetch('/open/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.code === 200) {
+                            // 上传成功，插入图片到编辑器
+                            // 确保编辑器仍然存在且可用
+                            if (!this.richEditor || !this.richEditor.getEditor()) {
+                                this.$message.error('编辑器已失效，请刷新页面重试');
+                                return;
+                            }
+                            
+                            const quillEditor = this.richEditor.getEditor();
+                            const range = quillEditor.getSelection();
+                            let insertIndex;
+                            
+                            if (range && range.index !== null && range.index >= 0) {
+                                // 如果有选中范围，在选中位置插入
+                                insertIndex = range.index;
+                            } else {
+                                // 如果没有选中范围，在编辑器末尾插入
+                                insertIndex = quillEditor.getLength();
+                            }
+                            
+                            try {
+                                quillEditor.insertEmbed(insertIndex, 'image', data.data.url);
+                                quillEditor.setSelection(insertIndex + 1);
+                                this.$message.success('图片上传成功');
+                            } catch (insertError) {
+                                console.error('插入图片失败:', insertError);
+                                this.$message.error('图片插入失败，请重试');
+                            }
+                        } else {
+                            this.$message.error(data.message || '图片上传失败');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('图片上传失败:', error);
+                        this.$message.error('图片上传失败');
+                    });
+                },
+
+                // 初始化富文本编辑器
+                initRichEditor() {
+                    this.$nextTick(() => {
+                        // 确保DOM元素存在
+                        const editorElement = document.getElementById('content-editor');
+                        if (!editorElement) {
+                            console.error('富文本编辑器容器元素未找到');
+                            return;
+                        }
+
+                        // 如果编辑器已经存在，先销毁
+                        if (this.richEditor) {
+                            try {
+                                this.richEditor.destroy();
+                                this.richEditor = null;
+                            } catch (error) {
+                                console.warn('销毁编辑器时出错:', error);
+                            }
+                        }
+
+                        // 检查RichEditor组件是否已加载
+                        if (typeof RichEditor === 'undefined') {
+                            console.error('RichEditor组件未加载，请确保已引入rich-editor.js');
+                            return;
+                        }
+
+                        try {
+                            // 创建富文本编辑器实例
+                            this.richEditor = new RichEditor({
+                                container: '#content-editor',
+                                placeholder: '请输入公告内容...',
+                                height: 300,
+                                toolbar: [
+                                    [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                    ['bold', 'italic', 'underline', 'strike'],
+                                    [{ 'color': [] }, { 'background': [] }],
+                                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                    [{ 'indent': '-1'}, { 'indent': '+1' }],
+                                    [{ 'align': [] }],
+                                    ['link', 'image'],
+                                    ['blockquote', 'code-block'],
+                                    ['clean']
+                                ],
+                                onChange: (content) => {
+                                    this.formData.content = content;
+                                },
+                                onReady: (editor) => {
+                                    console.log('富文本编辑器初始化成功');
+                                    // 配置图片上传
+                                    this.setupImageUpload();
+                                }
+                            });
+                        } catch (error) {
+                            console.error('富文本编辑器初始化失败:', error);
+                        }
+                    });
+                },
+
+                // 设置富文本编辑器内容
+                setEditorContent(content) {
+                    if (this.richEditor) {
+                        this.richEditor.setContent(content);
+                    }
+                },
+
+                // 获取富文本编辑器内容
+                getEditorContent() {
+                    return this.richEditor ? this.richEditor.getContent() : '';
+                },
+
+                // 去除HTML标签，获取纯文本内容
+                stripHtml(html) {
+                    if (!html) return '';
+                    // 创建临时DOM元素
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    // 获取纯文本内容
+                    return temp.textContent || temp.innerText || '';
+                },
+
+                // 处理下拉菜单命令
+                handleDropdownCommand(command, row) {
+                    switch (command) {
+                        case 'publish':
+                        case 'unpublish':
+                            this.handleToggleStatus(row);
+                            break;
+                        case 'top':
+                        case 'untop':
+                            this.handleToggleTop(row);
+                            break;
+                        case 'view':
+                            this.handleViewDetail(row);
+                            break;
+                        default:
+                            console.log('未知命令:', command);
+                    }
+                },
+
+                // 查看详情
+                handleViewDetail(row) {
+                    this.$alert(`
+                        <div style="text-align: left; max-height: 400px; overflow-y: auto;">
+                            <h3 style="margin: 0 0 15px 0; color: #303133; border-bottom: 1px solid #EBEEF5; padding-bottom: 10px;">${row.title}</h3>
+                            <div style="margin-bottom: 15px;">
+                                <strong>摘要：</strong>
+                                <p style="margin: 5px 0; color: #606266; line-height: 1.6;">${row.summary || '无摘要'}</p>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>状态：</strong>
+                                <span style="color: ${row.status === 1 ? '#67C23A' : '#F56C6C'};">
+                                    ${row.status === 1 ? '已发布' : '草稿'}
+                                </span>
+                            </div>
+                            <div style="margin-bottom: 15px;">
+                                <strong>置顶：</strong>
+                                <span style="color: ${row.isTop === 1 ? '#E6A23C' : '#909399'};">
+                                    ${row.isTop === 1 ? '已置顶' : '未置顶'}
+                                </span>
+                            </div>
+                            <div>
+                                <strong>内容：</strong>
+                                <div style="margin: 10px 0; padding: 10px; background: #F5F7FA; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                                    ${row.content || '无内容'}
+                                </div>
+                            </div>
+                        </div>
+                    `, '公告详情', {
+                        dangerouslyUseHTMLString: true,
+                        customClass: 'announcement-detail-alert'
+                    });
+                }
+            },
+            
+            // 组件销毁时清理资源
+            beforeDestroy() {
+                // 清理富文本编辑器
+                if (this.richEditor) {
+                    try {
+                        this.richEditor.destroy();
+                        this.richEditor = null;
+                    } catch (error) {
+                        console.warn('清理编辑器时出错:', error);
+                    }
+                }
+                
+                // 清理文件输入元素
+                const fileInputs = document.querySelectorAll('#quill-image-upload');
+                fileInputs.forEach(input => input.remove());
+            }
+        });
+    </script>
+</body>
+</html>

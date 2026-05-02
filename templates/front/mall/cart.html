@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购物车</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .cart-page { background: #f7f0ef; min-height: 100vh; padding: 28px 5% 60px; }
+
+        .cart-page-title {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 24px;
+            font-weight: 700;
+            color: #1a0a08;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .cart-page-title i { color: #e8a81a; font-size: 22px; }
+        .count-badge {
+            background: #e8a81a;
+            color: #fff;
+            font-size: 12px;
+            padding: 2px 9px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            font-weight: 600;
+        }
+
+        .cart-layout {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 22px;
+            align-items: start;
+        }
+        @media (max-width: 900px) {
+            .cart-layout { grid-template-columns: 1fr; }
+        }
+
+        .cart-list-panel {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 16px rgba(192,57,43,0.07);
+        }
+        .cart-list-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            border-bottom: 1px solid #f3e8e7;
+            background: #fdf5f5;
+        }
+        .cart-list-head-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #7d1f1f;
+            font-weight: 600;
+        }
+        .cart-list-head-right {
+            font-size: 12px;
+            color: #e8a81a;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: opacity .2s;
+        }
+        .cart-list-head-right:hover { opacity: .7; }
+
+        .custom-checkbox {
+            width: 18px; height: 18px;
+            border-radius: 5px;
+            border: 2px solid #e0c8c7;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all .2s;
+            background: #fff;
+            flex-shrink: 0;
+        }
+        .custom-checkbox.checked {
+            background: #e8a81a;
+            border-color: #e8a81a;
+        }
+        .custom-checkbox.checked::after {
+            content: '';
+            width: 5px; height: 9px;
+            border: 2px solid #fff;
+            border-top: none;
+            border-left: none;
+            transform: rotate(45deg) translateY(-1px);
+            display: block;
+        }
+
+        .cart-item {
+            display: flex;
+            align-items: center;
+            padding: 18px 24px;
+            border-bottom: 1px solid #faf0ef;
+            gap: 16px;
+            transition: background .2s;
+        }
+        .cart-item:last-child { border-bottom: none; }
+        .cart-item:hover { background: #fffaf9; }
+
+        .item-img {
+            width: 80px; height: 80px;
+            border-radius: 10px;
+            object-fit: cover;
+            flex-shrink: 0;
+            border: 1px solid #f0e0df;
+            cursor: pointer;
+            transition: transform .25s;
+        }
+        .item-img:hover { transform: scale(1.04); }
+
+        .item-info { flex: 1; min-width: 0; }
+        .item-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a0a08;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            cursor: pointer;
+        }
+        .item-name:hover { color: #e8a81a; }
+        .item-sku {
+            font-size: 12px;
+            color: #b09090;
+            background: #fdf5f5;
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .item-price-col { flex-shrink: 0; text-align: center; min-width: 80px; }
+        .item-unit-price {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e8a81a;
+            font-family: 'Noto Serif SC', serif;
+        }
+        .item-unit-label { font-size: 11px; color: #c0a0a0; margin-top: 2px; }
+
+        .item-qty-col { flex-shrink: 0; }
+        .qty-ctrl {
+            display: flex;
+            align-items: center;
+            border: 1px solid #e8d5d4;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .qty-btn {
+            width: 32px; height: 32px;
+            background: #fdf5f5;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #7d1f1f;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background .2s;
+        }
+        .qty-btn:hover { background: #f5d5d3; }
+        .qty-btn:disabled { color: #ccc; cursor: not-allowed; }
+        .qty-num {
+            width: 40px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a0a08;
+            border: none;
+            outline: none;
+            background: #fff;
+        }
+
+        .item-subtotal-col { flex-shrink: 0; text-align: right; min-width: 80px; }
+        .item-subtotal {
+            font-size: 16px;
+            font-weight: 700;
+            color: #e8a81a;
+            font-family: 'Noto Serif SC', serif;
+        }
+
+        .item-del {
+            flex-shrink: 0;
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            background: #fdf5f5;
+            border: 1px solid #f0dedd;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #c0a0a0;
+            font-size: 13px;
+            transition: all .2s;
+        }
+        .item-del:hover { background: #e8a81a; color: #fff; border-color: #e8a81a; }
+
+        .checkout-panel {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 16px rgba(192,57,43,0.07);
+            position: sticky;
+            top: 80px;
+        }
+        .checkout-panel-head {
+            background: linear-gradient(120deg, #96281b 0%, #e8a81a 100%);
+            padding: 20px 24px;
+            color: #fff;
+        }
+        .checkout-panel-head h3 {
+            font-family: 'Noto Serif SC', serif;
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 4px;
+        }
+        .checkout-panel-head p { font-size: 12px; opacity: .75; margin: 0; }
+        .checkout-panel-body { padding: 20px 24px; }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            color: #7d4040;
+            margin-bottom: 12px;
+        }
+        .summary-row.total {
+            border-top: 1px dashed #e8d5d4;
+            padding-top: 14px;
+            margin-top: 4px;
+            font-size: 15px;
+            font-weight: 700;
+            color: #1a0a08;
+        }
+        .summary-total-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e8a81a;
+            font-family: 'Noto Serif SC', serif;
+        }
+        .summary-total-price span { font-size: 14px; font-weight: 400; }
+        .btn-checkout {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(45deg, #e74c3c 0%, #e8a81a 60%, #96281b 100%);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 16px;
+            transition: opacity .2s, transform .15s;
+            letter-spacing: 1px;
+        }
+        .btn-checkout:hover { opacity: .9; transform: translateY(-1px); }
+        .btn-checkout:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-go-shop {
+            width: 100%;
+            padding: 10px;
+            background: #fdf5f5;
+            color: #e8a81a;
+            border: 1px solid #e8c4c0;
+            border-radius: 10px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all .2s;
+        }
+        .btn-go-shop:hover { background: #f5d5d3; }
+
+        .empty-cart {
+            background: #fff;
+            border-radius: 16px;
+            text-align: center;
+            padding: 80px 20px;
+            box-shadow: 0 2px 16px rgba(192,57,43,0.07);
+        }
+        .empty-cart i { font-size: 72px; color: #e0cece; display: block; margin-bottom: 20px; }
+        .empty-cart h3 { font-size: 18px; color: #7d4040; margin-bottom: 8px; font-family: 'Noto Serif SC', serif; }
+        .empty-cart p { font-size: 13px; color: #b09090; margin-bottom: 24px; }
+        .btn-empty-shop {
+            padding: 12px 36px;
+            background: #e8a81a;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        .btn-empty-shop:hover { background: #96281b; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <front-layout :user-info="userInfo" active-menu="3">
+        <div class="cart-page">
+
+            <div class="cart-page-title">
+                <i class="el-icon-shopping-cart-full"></i>
+                我的购物车
+                <span class="count-badge">{{ cartItems.length }}</span>
+            </div>
+
+            <div v-loading="loading">
+
+                <!-- 空购物车 -->
+                <div v-if="!loading && cartItems.length === 0" class="empty-cart">
+                    <i class="el-icon-shopping-cart-2"></i>
+                    <h3>购物车空空如也</h3>
+                    <p>快去挑选心仪的商品吧～</p>
+                    <button class="btn-empty-shop" @click="goShopping">去逛逛</button>
+                </div>
+
+                <!-- 有商品 -->
+                <div v-else-if="cartItems.length > 0" class="cart-layout">
+
+                    <!-- 左：商品列表 -->
+                    <div class="cart-list-panel">
+                        <div class="cart-list-head">
+                            <div class="cart-list-head-left">
+                                <div class="custom-checkbox" :class="{checked: selectAll}" @click="toggleSelectAll"></div>
+                                <span>全选</span>
+                                <span style="font-weight:400;color:#b09090">已选 {{ selectedItems.length }} 件</span>
+                            </div>
+                            <div class="cart-list-head-right" @click="clearCart">
+                                <i class="el-icon-delete"></i> 清空购物车
+                            </div>
+                        </div>
+
+                        <div v-for="item in cartItems" :key="item.id" class="cart-item">
+                            <div class="custom-checkbox" :class="{checked: isSelected(item)}" @click="toggleItem(item)"></div>
+                            <img class="item-img"
+                                :src="item.productImage || '/static/image/no-image.png'"
+                                :alt="item.productName"
+                                @click="viewProduct(item.productId)">
+                            <div class="item-info">
+                                <div class="item-name" @click="viewProduct(item.productId)">{{ item.productName }}</div>
+                                <span v-if="item.skuName" class="item-sku">{{ item.skuName }}</span>
+                            </div>
+                            <div class="item-price-col">
+                                <div class="item-unit-price"><span style="font-size:12px">¥</span>{{ item.price }}</div>
+                                <div class="item-unit-label">单价</div>
+                            </div>
+                            <div class="item-qty-col">
+                                <div class="qty-ctrl">
+                                    <button class="qty-btn" :disabled="item.quantity <= 1" @click="changeQty(item, -1)">−</button>
+                                    <input class="qty-num" :value="item.quantity" readonly>
+                                    <button class="qty-btn" :disabled="item.quantity >= (item.skuStock || 999)" @click="changeQty(item, 1)">+</button>
+                                </div>
+                            </div>
+                            <div class="item-subtotal-col">
+                                <div class="item-subtotal"><span style="font-size:12px;font-weight:400">¥</span>{{ (item.price * item.quantity).toFixed(2) }}</div>
+                            </div>
+                            <div class="item-del" @click="removeItem(item)" title="移除">
+                                <i class="el-icon-close"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右：结算面板 -->
+                    <div class="checkout-panel">
+                        <div class="checkout-panel-head">
+                            <h3>订单结算</h3>
+                            <p>确认商品后提交订单</p>
+                        </div>
+                        <div class="checkout-panel-body">
+                            <div class="summary-row">
+                                <span>已选商品</span>
+                                <span>{{ selectedItems.length }} 件</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>商品合计</span>
+                                <span>¥{{ subTotal.toFixed(2) }}</span>
+                            </div>
+                            <div class="summary-row">
+                                <span>运费</span>
+                                <span style="color:#10b981">免运费</span>
+                            </div>
+                            <div class="summary-row total">
+                                <span>应付金额</span>
+                                <div class="summary-total-price"><span>¥</span>{{ totalPrice.toFixed(2) }}</div>
+                            </div>
+                            <button class="btn-checkout" :disabled="selectedItems.length === 0" @click="checkout">
+                                立即结算 ({{ selectedItems.length }})
+                            </button>
+                            <button class="btn-go-shop" @click="goShopping">继续购物</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </front-layout>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/config/theme-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            userInfo: {},
+            cartItems: [],
+            loading: false,
+            selectedItems: []
+        };
+    },
+    computed: {
+        selectAll() {
+            return this.cartItems.length > 0 && this.selectedItems.length === this.cartItems.length;
+        },
+        subTotal() {
+            return this.selectedItems.reduce((t, item) => t + item.price * item.quantity, 0);
+        },
+        totalPrice() {
+            return this.subTotal;
+        }
+    },
+    mounted() {
+        this.checkAuth();
+        this.loadCart();
+    },
+    methods: {
+        checkAuth() {
+            const userInfo = localStorage.getItem('userInfo');
+            if (userInfo) {
+                this.userInfo = JSON.parse(userInfo);
+            } else {
+                this.$message.warning('请先登录');
+                window.location.href = '/login';
+            }
+        },
+        async loadCart() {
+            this.loading = true;
+            try {
+                const response = await fetch('/api/mall/cart/');
+                const result = await response.json();
+                if (result.code === 200) {
+                    this.cartItems = result.data;
+                    this.selectedItems = [...this.cartItems];
+                } else {
+                    this.$message.error(result.message);
+                }
+            } catch (e) {
+                this.$message.error('加载购物车失败');
+            } finally {
+                this.loading = false;
+            }
+        },
+        isSelected(item) {
+            return this.selectedItems.some(s => s.id === item.id);
+        },
+        toggleItem(item) {
+            const idx = this.selectedItems.findIndex(s => s.id === item.id);
+            if (idx >= 0) {
+                this.selectedItems.splice(idx, 1);
+            } else {
+                this.selectedItems.push(item);
+            }
+        },
+        toggleSelectAll() {
+            if (this.selectAll) {
+                this.selectedItems = [];
+            } else {
+                this.selectedItems = [...this.cartItems];
+            }
+        },
+        async changeQty(item, delta) {
+            const newQty = item.quantity + delta;
+            if (newQty < 1 || newQty > (item.skuStock || 999)) return;
+            item.quantity = newQty;
+            try {
+                const response = await fetch(`/api/mall/cart/${item.id}/quantity`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ quantity: newQty })
+                });
+                const result = await response.json();
+                if (result.code !== 200) {
+                    this.$message.error(result.message);
+                    this.loadCart();
+                }
+            } catch (e) {
+                this.$message.error('更新数量失败');
+                this.loadCart();
+            }
+        },
+        async removeItem(item) {
+            try {
+                const response = await fetch(`/api/mall/cart/${item.id}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.code === 200) {
+                    this.$message.success('已移除商品');
+                    this.loadCart();
+                } else {
+                    this.$message.error(result.message);
+                }
+            } catch (e) {
+                this.$message.error('移除失败');
+            }
+        },
+        async clearCart() {
+            try {
+                await this.$confirm('确定要清空购物车吗？', '提示', {
+                    confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning'
+                });
+                const response = await fetch('/api/mall/cart/clear', { method: 'DELETE' });
+                const result = await response.json();
+                if (result.code === 200) {
+                    this.$message.success('购物车已清空');
+                    this.loadCart();
+                } else {
+                    this.$message.error(result.message);
+                }
+            } catch (e) {
+                if (e !== 'cancel') this.$message.error('清空失败');
+            }
+        },
+        checkout() {
+            if (this.selectedItems.length === 0) {
+                this.$message.warning('请选择要结算的商品');
+                return;
+            }
+            localStorage.setItem('selectedCartItems', JSON.stringify(this.selectedItems));
+            window.location.href = '/front/mall/checkout.html';
+        },
+        goShopping() {
+            window.location.href = '/front/mall/mall.html';
+        },
+        viewProduct(productId) {
+            window.location.href = `/front/mall/product-detail.html?id=${productId}`;
+        }
+    }
+});
+</script>
+</body>
+</html>
+                    

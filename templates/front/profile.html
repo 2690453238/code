@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .profile-page { background: #f7f0ef; min-height: 100vh; padding: 28px 5% 60px; }
+        .profile-layout {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        @media (max-width: 900px) { .profile-layout { grid-template-columns: 1fr; } }
+        .profile-sidebar { position: sticky; top: 80px; }
+        .user-card {
+            background: linear-gradient(135deg, #96281b 0%, #e8a81a 60%, #e74c3c 100%);
+            border-radius: 16px; padding: 28px 20px 22px;
+            text-align: center; margin-bottom: 14px;
+            position: relative; overflow: hidden;
+        }
+        .user-card::before {
+            content: ''; position: absolute; right: -30px; top: -30px;
+            width: 120px; height: 120px; border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+        }
+        .avatar-wrap { position: relative; width: 88px; height: 88px; margin: 0 auto 12px; }
+        .avatar-wrap img {
+            width: 88px; height: 88px; border-radius: 50%;
+            object-fit: cover; border: 3px solid rgba(255,255,255,0.6);
+        }
+        .avatar-upload-btn {
+            position: absolute; bottom: 0; right: 0;
+            width: 26px; height: 26px; background: #fff; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            color: #e8a81a; font-size: 13px;
+        }
+        .user-card-name { font-family: 'Noto Serif SC', serif; font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+        .user-card-meta { font-size: 12px; color: rgba(255,255,255,0.7); }
+        .user-card-stats {
+            display: flex; justify-content: center;
+            margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 14px;
+        }
+        .uc-stat { flex: 1; text-align: center; border-right: 1px solid rgba(255,255,255,0.2); }
+        .uc-stat:last-child { border-right: none; }
+        .uc-stat-val { font-size: 15px; font-weight: 700; color: #fff; }
+        .uc-stat-label { font-size: 11px; color: rgba(255,255,255,0.65); margin-top: 2px; }
+        .side-nav { background: #fff; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 12px rgba(192,57,43,0.07); }
+        .side-nav-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 14px 20px; font-size: 14px; color: #5a3030;
+            cursor: pointer; border-left: 3px solid transparent;
+            transition: all .2s; border-bottom: 1px solid #faf0ef;
+        }
+        .side-nav-item:last-child { border-bottom: none; }
+        .side-nav-item:hover { background: #fdf5f5; color: #e8a81a; }
+        .side-nav-item.active { background: #fdf1f0; color: #e8a81a; font-weight: 700; border-left-color: #e8a81a; }
+        .side-nav-item i { font-size: 16px; width: 18px; text-align: center; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        .panel { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 14px rgba(192,57,43,0.07); margin-bottom: 20px; }
+        .panel-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 16px 24px; border-bottom: 1px solid #f3e8e7; background: #fdf5f5;
+        }
+        .panel-title { font-family: 'Noto Serif SC', serif; font-size: 15px; font-weight: 700; color: #7d1f1f; display: flex; align-items: center; gap: 8px; }
+        .panel-title i { color: #e8a81a; }
+        .panel-body { padding: 24px; }
+        .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+        .field-grid.full { grid-template-columns: 1fr; }
+        @media (max-width: 600px) { .field-grid { grid-template-columns: 1fr; } }
+        .field-item { display: flex; flex-direction: column; gap: 5px; }
+        .field-label { font-size: 12px; color: #9e7070; font-weight: 600; }
+        .field-input {
+            border: 1px solid #e8d5d4; border-radius: 8px;
+            padding: 9px 12px; font-size: 14px; color: #1a0a08;
+            outline: none; transition: border .2s; background: #fff; width: 100%;
+        }
+        .field-input:focus { border-color: #e8a81a; }
+        .field-input:disabled { background: #fdf5f5; color: #b09090; }
+        .field-select {
+            border: 1px solid #e8d5d4; border-radius: 8px;
+            padding: 9px 12px; font-size: 14px; color: #1a0a08;
+            outline: none; background: #fff; width: 100%; cursor: pointer;
+        }
+        .field-textarea {
+            border: 1px solid #e8d5d4; border-radius: 8px;
+            padding: 9px 12px; font-size: 14px; color: #1a0a08;
+            outline: none; resize: vertical; width: 100%; min-height: 90px; transition: border .2s;
+        }
+        .field-textarea:focus { border-color: #e8a81a; }
+        .btn-save {
+            padding: 9px 28px;
+            background: linear-gradient(45deg, #e74c3c, #e8a81a);
+            color: #fff; border: none; border-radius: 8px;
+            font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+        }
+        .btn-save:hover { opacity: .85; }
+        .btn-save:disabled { opacity: .6; cursor: not-allowed; }
+        .btn-reset {
+            padding: 9px 20px; background: #fdf5f5; color: #7d4040;
+            border: 1px solid #e8d5d4; border-radius: 8px;
+            font-size: 14px; cursor: pointer; margin-left: 8px; transition: all .2s;
+        }
+        .btn-reset:hover { border-color: #e8a81a; color: #e8a81a; }
+        .address-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+        .address-card {
+            border: 2px solid #f0e0df; border-radius: 12px;
+            padding: 16px 18px; background: #fff; transition: all .25s;
+        }
+        .address-card:hover { box-shadow: 0 4px 16px rgba(192,57,43,0.12); border-color: #e8c4c0; }
+        .address-card.is-default { border-color: #e8a81a; background: #fdf8f7; }
+        .addr-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .addr-name { font-weight: 700; color: #1a0a08; font-size: 14px; }
+        .addr-phone { font-size: 12px; color: #9e7070; }
+        .addr-default-badge { background: #e8a81a; color: #fff; font-size: 11px; padding: 1px 7px; border-radius: 10px; margin-left: auto; }
+        .addr-detail { font-size: 13px; color: #6b3535; line-height: 1.6; margin-bottom: 12px; }
+        .addr-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .addr-btn { padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; border: 1px solid #e8d5d4; background: #fff; color: #7d4040; transition: all .2s; }
+        .addr-btn:hover { border-color: #e8a81a; color: #e8a81a; }
+        .addr-btn.danger:hover { background: #e8a81a; color: #fff; border-color: #e8a81a; }
+        .add-address-card {
+            border: 2px dashed #e8d5d4; border-radius: 12px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 130px; cursor: pointer; transition: all .25s;
+            color: #c0a0a0; font-size: 13px; gap: 8px;
+        }
+        .add-address-card:hover { border-color: #e8a81a; color: #e8a81a; background: #fdf8f7; }
+        .add-address-card i { font-size: 28px; }
+        .el-button--primary { background-color: #e8a81a !important; border-color: #e8a81a !important; }
+        .el-button--primary:hover { background-color: #e74c3c !important; border-color: #e74c3c !important; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <front-layout :active-menu="activeMenu" :user-info="userInfo">
+        <div class="profile-page">
+            <div class="profile-layout">
+
+                <!-- 左侧侧边栏 -->
+                <div class="profile-sidebar">
+                    <div class="user-card">
+                        <div class="avatar-wrap">
+                            <img :src="userInfo.avatar || '/static/image/profile.png'" alt="头像">
+                            <el-upload class="avatar-upload-btn" :action="uploadUrl"
+                                :show-file-list="false"
+                                :on-success="handleAvatarSuccess"
+                                :before-upload="beforeAvatarUpload">
+                                <i class="el-icon-camera"></i>
+                            </el-upload>
+                        </div>
+                        <div class="user-card-name">{{ userInfo.nickname || userInfo.username }}</div>
+                        <div class="user-card-meta">{{ userInfo.email || '未设置邮箱' }}</div>
+                        <div class="user-card-stats">
+                            <div class="uc-stat">
+                                <div class="uc-stat-val">{{ userInfo.phone ? userInfo.phone.slice(0,3)+'****'+userInfo.phone.slice(-4) : '--' }}</div>
+                                <div class="uc-stat-label">手机</div>
+                            </div>
+                            <div class="uc-stat">
+                                <div class="uc-stat-val">{{ userInfo.sex || '--' }}</div>
+                                <div class="uc-stat-label">性别</div>
+                            </div>
+                            <div class="uc-stat">
+                                <div class="uc-stat-val">{{ userInfo.age || '--' }}</div>
+                                <div class="uc-stat-label">年龄</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="side-nav">
+                        <div class="side-nav-item" :class="{active: activeTab==='profile'}" @click="activeTab='profile'">
+                            <i class="el-icon-user"></i> 个人信息
+                        </div>
+                        <div class="side-nav-item" :class="{active: activeTab==='password'}" @click="activeTab='password'">
+                            <i class="el-icon-lock"></i> 修改密码
+                        </div>
+                        <div class="side-nav-item" :class="{active: activeTab==='addresses'}" @click="switchTab('addresses')">
+                            <i class="el-icon-location"></i> 收货地址
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 右侧内容区 -->
+                <div class="profile-content">
+
+                    <!-- 个人信息 -->
+                    <div class="content-section" :class="{active: activeTab==='profile'}">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div class="panel-title"><i class="el-icon-user"></i>基本资料</div>
+                                <button class="btn-save" @click="saveProfile" :disabled="saveLoading">
+                                    {{ saveLoading ? '保存中…' : '保存修改' }}
+                                </button>
+                            </div>
+                            <div class="panel-body">
+                                <div class="field-grid" style="margin-bottom:16px">
+                                    <div class="field-item">
+                                        <label class="field-label">用户名</label>
+                                        <input class="field-input" :value="profileForm.username" disabled>
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">真实姓名</label>
+                                        <input class="field-input" v-model="profileForm.nickname" placeholder="请输入真实姓名">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">邮箱</label>
+                                        <input class="field-input" v-model="profileForm.email" placeholder="请输入邮箱">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">手机号</label>
+                                        <input class="field-input" v-model="profileForm.phone" placeholder="请输入手机号">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">性别</label>
+                                        <select class="field-select" v-model="profileForm.sex">
+                                            <option value="">请选择</option>
+                                            <option value="男">男</option>
+                                            <option value="女">女</option>
+                                        </select>
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">年龄</label>
+                                        <input class="field-input" type="number" v-model.number="profileForm.age" min="1" max="120" placeholder="请输入年龄">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">生日</label>
+                                        <input class="field-input" type="date" v-model="profileForm.birthday">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">学历</label>
+                                        <select class="field-select" v-model="profileForm.education">
+                                            <option value="">请选择</option>
+                                            <option v-for="e in ['小学','初中','高中','大专','本科','硕士','博士']" :key="e" :value="e">{{ e }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">职业</label>
+                                        <input class="field-input" v-model="profileForm.profession" placeholder="请输入职业">
+                                    </div>
+                                    <div class="field-item">
+                                        <label class="field-label">公司</label>
+                                        <input class="field-input" v-model="profileForm.company" placeholder="请输入公司">
+                                    </div>
+                                </div>
+                                <div class="field-grid full" style="margin-bottom:16px">
+                                    <div class="field-item">
+                                        <label class="field-label">地址</label>
+                                        <input class="field-input" v-model="profileForm.address" placeholder="请输入地址">
+                                    </div>
+                                </div>
+                                <div class="field-grid full">
+                                    <div class="field-item">
+                                        <label class="field-label">个人简介</label>
+                                        <textarea class="field-textarea" v-model="profileForm.content" placeholder="请输入个人简介"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 修改密码 -->
+                    <div class="content-section" :class="{active: activeTab==='password'}">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div class="panel-title"><i class="el-icon-lock"></i>修改密码</div>
+                            </div>
+                            <div class="panel-body">
+                                <div style="max-width:420px">
+                                    <div class="field-item" style="margin-bottom:14px">
+                                        <label class="field-label">原密码</label>
+                                        <input class="field-input" type="password" v-model="passwordForm.oldPassword" placeholder="请输入原密码">
+                                    </div>
+                                    <div class="field-item" style="margin-bottom:14px">
+                                        <label class="field-label">新密码</label>
+                                        <input class="field-input" type="password" v-model="passwordForm.newPassword" placeholder="至少6位">
+                                    </div>
+                                    <div class="field-item" style="margin-bottom:22px">
+                                        <label class="field-label">确认密码</label>
+                                        <input class="field-input" type="password" v-model="passwordForm.confirmPassword" placeholder="再次输入新密码">
+                                    </div>
+                                    <button class="btn-save" @click="changePassword" :disabled="passwordLoading">
+                                        {{ passwordLoading ? '提交中…' : '确认修改' }}
+                                    </button>
+                                    <button class="btn-reset" @click="resetPasswordForm">重置</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 收货地址 -->
+                    <div class="content-section" :class="{active: activeTab==='addresses'}">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div class="panel-title"><i class="el-icon-location"></i>收货地址</div>
+                            </div>
+                            <div class="panel-body">
+                                <div v-loading="addressesLoading">
+                                    <div class="address-grid">
+                                        <div v-for="address in addresses" :key="address.id"
+                                            class="address-card" :class="{'is-default': address.isDefault}">
+                                            <div class="addr-head">
+                                                <span class="addr-name">{{ address.name }}</span>
+                                                <span class="addr-phone">{{ address.phone }}</span>
+                                                <span v-if="address.isDefault" class="addr-default-badge">默认</span>
+                                            </div>
+                                            <div class="addr-detail">{{ address.address }}</div>
+                                            <div class="addr-actions">
+                                                <button class="addr-btn" @click="editAddress(address)">编辑</button>
+                                                <button v-if="!address.isDefault" class="addr-btn" @click="setDefaultAddress(address.id)">设为默认</button>
+                                                <button class="addr-btn danger" @click="deleteAddress(address.id)">删除</button>
+                                            </div>
+                                        </div>
+                                        <div class="add-address-card" @click="showAddAddressDialog">
+                                            <i class="el-icon-plus"></i>
+                                            <span>添加新地址</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </front-layout>
+
+    <!-- 地址编辑对话框 -->
+    <el-dialog :title="addressDialog.title" :visible.sync="addressDialog.visible" width="560px" @close="resetAddressForm">
+        <el-form :model="addressForm" :rules="addressRules" ref="addressForm" label-width="90px">
+            <el-row :gutter="20">
+                <el-col :span="12">
+                    <el-form-item label="收货人" prop="name">
+                        <el-input v-model="addressForm.name" placeholder="收货人姓名"></el-input>
+                    </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                    <el-form-item label="手机号" prop="phone">
+                        <el-input v-model="addressForm.phone" placeholder="手机号"></el-input>
+                    </el-form-item>
+                </el-col>
+            </el-row>
+            <el-form-item label="省市区">
+                <el-cascader v-model="addressForm.region" :options="regionOptions" :props="cascaderProps"
+                    placeholder="请选择省市区" @change="handleRegionChange" style="width:100%"></el-cascader>
+            </el-form-item>
+            <el-form-item label="详细地址" prop="address">
+                <el-input v-model="addressForm.address" type="textarea" :rows="3" placeholder="详细地址"></el-input>
+            </el-form-item>
+            <el-form-item>
+                <el-checkbox v-model="addressForm.isDefault">设为默认地址</el-checkbox>
+            </el-form-item>
+        </el-form>
+        <div slot="footer">
+            <el-button @click="addressDialog.visible = false">取消</el-button>
+            <el-button type="primary" @click="saveAddress" :loading="addressDialog.loading">保存</el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script src="/static/js/config/theme-config.js"></script>
+<script src="/static/js/data/region-data.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            activeMenu: 'profile',
+            activeTab: 'profile',
+            userInfo: {},
+            saveLoading: false,
+            passwordLoading: false,
+            uploadUrl: '/open/upload',
+            addresses: [],
+            addressesLoading: false,
+            addressDialog: { visible: false, title: '添加地址', loading: false },
+            addressForm: { id: null, name: '', phone: '', region: [], province: '', city: '', district: '', address: '', isDefault: false },
+            regionOptions: [],
+            cascaderProps: { value: 'code', label: 'name', children: 'children' },
+            profileForm: { username: '', nickname: '', email: '', phone: '', sex: '', age: null, birthday: '', education: '', profession: '', company: '', address: '', content: '' },
+            passwordForm: { oldPassword: '', newPassword: '', confirmPassword: '' },
+            profileRules: {
+                nickname: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
+                email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }],
+                phone: [{ pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }]
+            },
+            addressRules: {
+                name: [{ required: true, message: '请输入收货人姓名', trigger: 'blur' }],
+                phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }, { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }],
+                address: [{ required: true, message: '请输入详细地址', trigger: 'blur' }]
+            }
+        };
+    },
+    mounted() {
+        this.checkAuth();
+        this.loadUserInfo();
+        this.initRegionData();
+    },
+    methods: {
+        checkAuth() {
+            const u = localStorage.getItem('userInfo');
+            if (u) { this.userInfo = JSON.parse(u); }
+            else { this.$message.warning('请先登录'); window.location.href = '/login'; }
+        },
+        switchTab(name) {
+            this.activeTab = name;
+            if (name === 'addresses') this.loadAddresses();
+        },
+        loadUserInfo() {
+            axios.get('/api/user/profile').then(res => {
+                if (res.data.code === 200) { this.userInfo = res.data.data; this.profileForm = { ...res.data.data }; }
+                else this.$message.error(res.data.message);
+            }).catch(() => this.$message.error('获取用户信息失败'));
+        },
+        saveProfile() {
+            if (!this.profileForm.nickname) { this.$message.warning('请输入真实姓名'); return; }
+            this.saveLoading = true;
+            axios.put(`/api/user/${this.userInfo.id}`, this.profileForm)
+                .then(res => {
+                    if (res.data.code === 200) { this.$message.success(res.data.message); this.loadUserInfo(); }
+                    else this.$message.error(res.data.message);
+                }).catch(() => this.$message.error('保存失败'))
+                .finally(() => { this.saveLoading = false; });
+        },
+        changePassword() {
+            if (!this.passwordForm.oldPassword || !this.passwordForm.newPassword) { this.$message.warning('请填写完整密码信息'); return; }
+            if (this.passwordForm.newPassword !== this.passwordForm.confirmPassword) { this.$message.error('两次密码不一致'); return; }
+            if (this.passwordForm.newPassword.length < 6) { this.$message.warning('密码长度不能少于6位'); return; }
+            this.passwordLoading = true;
+            axios.post('/api/user/change-password', this.passwordForm)
+                .then(res => {
+                    if (res.data.code === 200) { this.$message.success(res.data.message); this.resetPasswordForm(); }
+                    else this.$message.error(res.data.message);
+                }).catch(() => this.$message.error('修改密码失败'))
+                .finally(() => { this.passwordLoading = false; });
+        },
+        resetPasswordForm() {
+            this.passwordForm = { oldPassword: '', newPassword: '', confirmPassword: '' };
+        },
+        handleAvatarSuccess(response) {
+            if (response.code === 200) {
+                this.userInfo.avatar = response.data.url;
+                this.$message.success('头像上传成功');
+                axios.put(`/api/user/${this.userInfo.id}`, { avatar: response.data.url }).then(() => this.loadUserInfo());
+            } else this.$message.error(response.message);
+        },
+        beforeAvatarUpload(file) {
+            const ok = (file.type === 'image/jpeg' || file.type === 'image/png') && file.size / 1024 / 1024 < 2;
+            if (!ok) this.$message.error('请上传 JPG/PNG 格式且不超过 2MB 的图片');
+            return ok;
+        },
+        initRegionData() {
+            const normalize = (data) => {
+                if (!Array.isArray(data)) return [];
+                return data.map(p => ({
+                    name: p.name, code: p.code,
+                    children: (p.children || p.city || []).map(c => ({
+                        name: c.name, code: c.code,
+                        children: (c.children || c.area || []).map(a => ({ name: a.name, code: a.code }))
+                    }))
+                }));
+            };
+            this.regionOptions = normalize(window.regionData || []);
+        },
+        handleRegionChange(value) {
+            if (value && value.length >= 3) {
+                const names = this.getRegionNames(value);
+                this.addressForm.province = names[0]; this.addressForm.city = names[1]; this.addressForm.district = names[2];
+            } else { this.addressForm.province = ''; this.addressForm.city = ''; this.addressForm.district = ''; }
+        },
+        getRegionNames(codes) {
+            const names = []; let current = this.regionOptions;
+            for (const code of codes) {
+                const item = current.find(r => r.code === code);
+                names.push(item ? item.name : ''); current = item ? (item.children || []) : [];
+            }
+            return names;
+        },
+        setRegionCodes(province, city, district) {
+            const codes = []; let current = this.regionOptions;
+            const p = current.find(r => r.name === province);
+            if (p) { codes.push(p.code); current = p.children || [];
+                const c = current.find(r => r.name === city);
+                if (c) { codes.push(c.code); current = c.children || [];
+                    const d = current.find(r => r.name === district);
+                    if (d) codes.push(d.code);
+                }
+            }
+            return codes;
+        },
+        async loadAddresses() {
+            this.addressesLoading = true;
+            try {
+                const res = await axios.get('/api/mall/address');
+                if (res.data.code === 200) this.addresses = res.data.data || [];
+                else this.$message.error(res.data.message);
+            } catch(e) { this.$message.error('加载地址失败'); }
+            finally { this.addressesLoading = false; }
+        },
+        showAddAddressDialog() {
+            this.addressDialog.title = '添加地址'; this.addressDialog.visible = true; this.resetAddressForm();
+        },
+        editAddress(address) {
+            this.addressDialog.title = '编辑地址'; this.addressDialog.visible = true;
+            this.addressForm = { ...address };
+            if (address.province && address.city && address.district)
+                this.addressForm.region = this.setRegionCodes(address.province, address.city, address.district);
+            else this.addressForm.region = [];
+        },
+        async saveAddress() {
+            this.$refs.addressForm.validate(async valid => {
+                if (!valid) return;
+                this.addressDialog.loading = true;
+                try {
+                    const url = this.addressForm.id ? `/api/mall/address/${this.addressForm.id}` : '/api/mall/address';
+                    const method = this.addressForm.id ? 'put' : 'post';
+                    const res = await axios[method](url, this.addressForm);
+                    if (res.data.code === 200) {
+                        this.$message.success(res.data.message);
+                        this.addressDialog.visible = false;
+                        this.loadAddresses();
+                    } else this.$message.error(res.data.message);
+                } catch(e) { this.$message.error('保存地址失败'); }
+                finally { this.addressDialog.loading = false; }
+            });
+        },
+        resetAddressForm() {
+            this.addressForm = { id: null, name: '', phone: '', region: [], province: '', city: '', district: '', address: '', isDefault: false };
+            this.$refs.addressForm && this.$refs.addressForm.resetFields();
+        },
+        async setDefaultAddress(addressId) {
+            try {
+                const res = await axios.put(`/api/mall/address/${addressId}/default`);
+                if (res.data.code === 200) { this.$message.success('设置默认地址成功'); this.loadAddresses(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { this.$message.error('操作失败'); }
+        },
+        async deleteAddress(addressId) {
+            try {
+                await this.$confirm('确定要删除这个地址吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' });
+                const res = await axios.delete(`/api/mall/address/${addressId}`);
+                if (res.data.code === 200) { this.$message.success('删除地址成功'); this.loadAddresses(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { if (e !== 'cancel') this.$message.error('删除失败'); }
+        }
+    }
+});
+</script>
+</body>
+</html>

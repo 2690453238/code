@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单结算</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .checkout-page { background: #f7f0ef; min-height: 100vh; padding: 28px 5% 60px; }
+        .steps-bar { display: flex; align-items: center; background: #fff; border-radius: 14px; padding: 18px 32px; margin-bottom: 24px; box-shadow: 0 2px 12px rgba(192,57,43,0.07); }
+        .step { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; font-size: 12px; color: #c0a0a0; }
+        .step-circle { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #e8d5d4; background: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #c0a0a0; margin-bottom: 6px; transition: all .2s; }
+        .step.active .step-circle { background: #e8a81a; border-color: #e8a81a; color: #fff; }
+        .step.active { color: #e8a81a; font-weight: 700; }
+        .step.done .step-circle { background: #e8c4c0; border-color: #e8a81a; color: #e8a81a; }
+        .step-line { flex: 1; height: 2px; background: #e8d5d4; margin: 0 12px 18px; }
+        .step-line.done { background: #e8a81a; }
+        .checkout-layout { display: grid; grid-template-columns: 1fr 340px; gap: 22px; align-items: start; }
+        @media (max-width: 960px) { .checkout-layout { grid-template-columns: 1fr; } }
+        .panel { background: #fff; border-radius: 16px; overflow: hidden; margin-bottom: 18px; box-shadow: 0 2px 14px rgba(192,57,43,0.07); }
+        .panel-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 22px; background: #fdf5f5; border-bottom: 1px solid #f3e8e7; }
+        .panel-title { font-family: 'Noto Serif SC', serif; font-size: 14px; font-weight: 700; color: #7d1f1f; display: flex; align-items: center; gap: 7px; }
+        .panel-title i { color: #e8a81a; }
+        .panel-body { padding: 20px 22px; }
+        .addr-selected { display: flex; align-items: flex-start; gap: 16px; padding: 16px 18px; border: 2px solid #e8a81a; border-radius: 12px; background: #fdf8f7; }
+        .addr-selected-icon { width: 36px; height: 36px; border-radius: 50%; background: #e8a81a; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+        .addr-selected-info { flex: 1; }
+        .addr-selected-name { font-size: 15px; font-weight: 700; color: #1a0a08; margin-bottom: 3px; }
+        .addr-selected-phone { font-size: 12px; color: #9e7070; margin-bottom: 4px; }
+        .addr-selected-detail { font-size: 13px; color: #6b3535; line-height: 1.6; }
+        .btn-change-addr { padding: 6px 14px; border-radius: 8px; background: #fff; color: #e8a81a; border: 1px solid #e8c4c0; font-size: 12px; cursor: pointer; transition: all .2s; flex-shrink: 0; }
+        .btn-change-addr:hover { background: #e8a81a; color: #fff; }
+        .btn-add-addr { width: 100%; padding: 14px; border: 2px dashed #e8d5d4; border-radius: 12px; background: #fff; color: #c0a0a0; font-size: 13px; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+        .btn-add-addr:hover { border-color: #e8a81a; color: #e8a81a; background: #fdf8f7; }
+        .checkout-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #faf0ef; }
+        .checkout-item:last-child { border-bottom: none; }
+        .ci-img { width: 68px; height: 68px; border-radius: 10px; object-fit: cover; border: 1px solid #f0e0df; flex-shrink: 0; }
+        .ci-info { flex: 1; min-width: 0; }
+        .ci-name { font-size: 14px; font-weight: 600; color: #1a0a08; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+        .ci-sku { font-size: 12px; color: #b09090; }
+        .ci-price { font-size: 15px; font-weight: 700; color: #e8a81a; font-family: 'Noto Serif SC', serif; flex-shrink: 0; }
+        .ci-qty { font-size: 12px; color: #9e7070; flex-shrink: 0; min-width: 32px; text-align: center; }
+        .ci-subtotal { font-size: 15px; font-weight: 700; color: #e8a81a; font-family: 'Noto Serif SC', serif; flex-shrink: 0; min-width: 72px; text-align: right; }
+        .remark-input { width: 100%; border: 1px solid #e8d5d4; border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #1a0a08; outline: none; resize: none; min-height: 72px; transition: border .2s; }
+        .remark-input:focus { border-color: #e8a81a; }
+        .payment-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+        .pay-card { flex: 1; min-width: 100px; border: 2px solid #f0e0df; border-radius: 12px; padding: 14px 10px; text-align: center; cursor: pointer; transition: all .2s; background: #fff; }
+        .pay-card:hover { border-color: #e8a81a; }
+        .pay-card.selected { border-color: #e8a81a; background: #fdf8f7; }
+        .pay-card .pay-icon { font-size: 26px; margin-bottom: 6px; }
+        .pay-card .pay-name { font-size: 13px; font-weight: 600; color: #5a3030; }
+        .pay-card.selected .pay-name { color: #e8a81a; }
+        .summary-panel { background: #fff; border-radius: 16px; overflow: hidden; position: sticky; top: 80px; box-shadow: 0 2px 14px rgba(192,57,43,0.07); }
+        .summary-head { background: linear-gradient(120deg, #96281b 0%, #e8a81a 100%); padding: 18px 22px; color: #fff; }
+        .summary-head h3 { font-family: 'Noto Serif SC', serif; font-size: 16px; font-weight: 700; margin: 0 0 3px; }
+        .summary-head p { font-size: 12px; opacity: .72; margin: 0; }
+        .summary-body { padding: 18px 22px; }
+        .sum-row { display: flex; justify-content: space-between; font-size: 13px; color: #7d4040; margin-bottom: 11px; }
+        .sum-row.total { border-top: 1px dashed #e8d5d4; padding-top: 13px; margin-top: 4px; font-size: 15px; font-weight: 700; color: #1a0a08; }
+        .sum-total-price { font-size: 26px; font-weight: 700; color: #e8a81a; font-family: 'Noto Serif SC', serif; }
+        .sum-total-price span { font-size: 14px; font-weight: 400; }
+        .btn-submit { width: 100%; padding: 15px; background: linear-gradient(45deg, #e74c3c 0%, #e8a81a 60%, #96281b 100%); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 16px; transition: opacity .2s, transform .15s; letter-spacing: 1px; }
+        .btn-submit:hover { opacity: .9; transform: translateY(-1px); }
+        .btn-submit:disabled { background: #ccc; cursor: not-allowed; transform: none; }
+        .btn-back { width: 100%; padding: 10px; background: #fdf5f5; color: #e8a81a; border: 1px solid #e8c4c0; border-radius: 10px; font-size: 13px; cursor: pointer; margin-top: 10px; transition: all .2s; }
+        .btn-back:hover { background: #f5d5d3; }
+        .sum-items-preview { margin-bottom: 14px; }
+        .sum-item-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #faf0ef; font-size: 12px; }
+        .sum-item-row:last-child { border-bottom: none; }
+        .sum-item-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+        .sum-item-name { flex: 1; color: #5a3030; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sum-item-price { color: #e8a81a; font-weight: 700; flex-shrink: 0; }
+        .empty-checkout { background: #fff; border-radius: 16px; text-align: center; padding: 80px 20px; box-shadow: 0 2px 16px rgba(192,57,43,0.07); }
+        .empty-checkout i { font-size: 72px; color: #e0cece; display: block; margin-bottom: 20px; }
+        .empty-checkout h3 { font-size: 18px; color: #7d4040; margin-bottom: 8px; font-family: 'Noto Serif SC', serif; }
+        .empty-checkout p { font-size: 13px; color: #b09090; margin-bottom: 24px; }
+        .btn-go-shop { padding: 12px 36px; background: #e8a81a; color: #fff; border: none; border-radius: 30px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-go-shop:hover { background: #96281b; }
+        .addr-option { border: 2px solid #f0e0df; border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: all .2s; }
+        .addr-option:hover { border-color: #e8c4c0; }
+        .addr-option.selected { border-color: #e8a81a; background: #fdf8f7; }
+        .addr-opt-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .addr-opt-name { font-weight: 700; color: #1a0a08; }
+        .addr-opt-phone { font-size: 12px; color: #9e7070; }
+        .addr-opt-detail { font-size: 13px; color: #6b3535; line-height: 1.5; }
+        .addr-default-dot { width: 8px; height: 8px; border-radius: 50%; background: #e8a81a; margin-left: auto; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <front-layout :user-info="userInfo" active-menu="cart">
+        <div class="checkout-page">
+            <div class="steps-bar">
+                <div class="step done">
+                    <div class="step-circle"><i class="el-icon-check"></i></div>
+                    <span>购物车</span>
+                </div>
+                <div class="step-line done"></div>
+                <div class="step active">
+                    <div class="step-circle">2</div>
+                    <span>确认订单</span>
+                </div>
+                <div class="step-line"></div>
+                <div class="step">
+                    <div class="step-circle">3</div>
+                    <span>支付完成</span>
+                </div>
+            </div>
+
+            <div v-if="checkoutItems.length === 0 && !loading" class="empty-checkout">
+                <i class="el-icon-shopping-cart-2"></i>
+                <h3>暂无待结算商品</h3>
+                <p>请先前往购物车选择商品</p>
+                <button class="btn-go-shop" @click="goBack">返回购物车</button>
+            </div>
+
+            <div v-else-if="checkoutItems.length > 0" class="checkout-layout" v-loading="loading">
+                <div>
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title"><i class="el-icon-location"></i>收货地址</div>
+                            <button v-if="selectedAddress" class="btn-change-addr" @click="openAddressSelector">更换地址</button>
+                        </div>
+                        <div class="panel-body">
+                            <div v-if="selectedAddress" class="addr-selected">
+                                <div class="addr-selected-icon">
+                                    <i class="el-icon-location-information"></i>
+                                </div>
+                                <div class="addr-selected-info">
+                                    <div class="addr-selected-name">{{ selectedAddress.name }}</div>
+                                    <div class="addr-selected-phone">{{ selectedAddress.phone }}</div>
+                                    <div class="addr-selected-detail">{{ formatAddress(selectedAddress) }}</div>
+                                </div>
+                            </div>
+                            <button v-else class="btn-add-addr" @click="openAddressSelector">
+                                <i class="el-icon-plus"></i>
+                                <span>请选择收货地址</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title"><i class="el-icon-goods"></i>确认商品</div>
+                        </div>
+                        <div class="panel-body">
+                            <div v-for="item in checkoutItems" :key="item.id" class="checkout-item">
+                                <img class="ci-img" :src="item.productImage || '/static/image/no-image.png'" :alt="item.productName">
+                                <div class="ci-info">
+                                    <div class="ci-name">{{ item.productName }}</div>
+                                    <div v-if="item.skuName" class="ci-sku">{{ item.skuName }}</div>
+                                </div>
+                                <div class="ci-price"><span style="font-size:11px;font-weight:400">楼</span>{{ Number(item.price).toFixed(2) }}</div>
+                                <div class="ci-qty">x{{ item.quantity }}</div>
+                                <div class="ci-subtotal"><span style="font-size:11px;font-weight:400">楼</span>{{ (Number(item.price) * Number(item.quantity)).toFixed(2) }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title"><i class="el-icon-bank-card"></i>支付方式</div>
+                        </div>
+                        <div class="panel-body">
+                            <div class="payment-grid">
+                                <div class="pay-card" :class="{selected: selectedPayment === 'alipay'}" @click="selectedPayment = 'alipay'">
+                                    <div class="pay-icon">￥</div>
+                                    <div class="pay-name">支付宝</div>
+                                </div>
+                                <div class="pay-card" :class="{selected: selectedPayment === 'wechat'}" @click="selectedPayment = 'wechat'">
+                                    <div class="pay-icon">微</div>
+                                    <div class="pay-name">微信支付</div>
+                                </div>
+                                <div class="pay-card" :class="{selected: selectedPayment === 'bank'}" @click="selectedPayment = 'bank'">
+                                    <div class="pay-icon">卡</div>
+                                    <div class="pay-name">银行卡</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel">
+                        <div class="panel-head">
+                            <div class="panel-title"><i class="el-icon-edit-outline"></i>订单备注</div>
+                        </div>
+                        <div class="panel-body">
+                            <textarea class="remark-input" v-model="remark" placeholder="选填：对本次订单的备注"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-panel">
+                    <div class="summary-head">
+                        <h3>订单摘要</h3>
+                        <p>请确认信息后提交订单</p>
+                    </div>
+                    <div class="summary-body">
+                        <div class="sum-items-preview">
+                            <div v-for="item in checkoutItems" :key="item.id" class="sum-item-row">
+                                <img class="sum-item-img" :src="item.productImage || '/static/image/no-image.png'" :alt="item.productName">
+                                <span class="sum-item-name">{{ item.productName }}</span>
+                                <span class="sum-item-price">楼{{ (Number(item.price) * Number(item.quantity)).toFixed(2) }}</span>
+                            </div>
+                        </div>
+                        <div class="sum-row"><span>商品合计</span><span>楼{{ totalPrice.toFixed(2) }}</span></div>
+                        <div class="sum-row"><span>运费</span><span style="color:#10b981">免运费</span></div>
+                        <div class="sum-row"><span>支付方式</span><span>{{ paymentLabel }}</span></div>
+                        <div class="sum-row total">
+                            <span>应付金额</span>
+                            <div class="sum-total-price"><span>楼</span>{{ totalPrice.toFixed(2) }}</div>
+                        </div>
+                        <button class="btn-submit" :disabled="!selectedAddress || !selectedPayment || submitting" @click="submitOrder">
+                            {{ submitting ? '提交中...' : '提交订单' }}
+                        </button>
+                        <button class="btn-back" @click="goBack">返回购物车</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </front-layout>
+
+    <el-dialog title="选择收货地址" :visible.sync="showAddressDialog" width="580px">
+        <div v-if="addresses.length === 0" style="text-align:center;padding:40px">
+            <p style="color:#9e7070;margin-bottom:16px">暂无收货地址</p>
+            <el-button type="primary" @click="goToAddressManagement">去添加地址</el-button>
+        </div>
+        <div v-else>
+            <div
+                v-for="address in addresses"
+                :key="address.id"
+                class="addr-option"
+                :class="{selected: tempSelectedAddress && tempSelectedAddress.id === address.id}"
+                @click="tempSelectedAddress = address"
+            >
+                <div class="addr-opt-head">
+                    <span class="addr-opt-name">{{ address.name }}</span>
+                    <span class="addr-opt-phone">{{ address.phone }}</span>
+                    <div v-if="address.isDefault" class="addr-default-dot"></div>
+                </div>
+                <div class="addr-opt-detail">{{ formatAddress(address) }}</div>
+            </div>
+        </div>
+        <div slot="footer">
+            <el-button @click="showAddressDialog = false">取消</el-button>
+            <el-button type="primary" @click="confirmAddress" :disabled="!tempSelectedAddress">确认使用</el-button>
+        </div>
+    </el-dialog>
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/config/theme-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            userInfo: {},
+            checkoutItems: [],
+            addresses: [],
+            selectedAddress: null,
+            tempSelectedAddress: null,
+            selectedPayment: 'alipay',
+            loading: false,
+            submitting: false,
+            showAddressDialog: false,
+            remark: '',
+            shippingFee: 0
+        };
+    },
+    computed: {
+        totalPrice() {
+            return this.checkoutItems.reduce((total, item) => {
+                return total + Number(item.price) * Number(item.quantity);
+            }, 0);
+        },
+        paymentLabel() {
+            const label_map = {
+                alipay: '支付宝',
+                wechat: '微信支付',
+                bank: '银行卡'
+            };
+            return label_map[this.selectedPayment] || this.selectedPayment;
+        }
+    },
+    mounted() {
+        this.checkAuth();
+        this.loadCheckoutData();
+        this.loadAddresses();
+    },
+    methods: {
+        checkAuth() {
+            const user_info = localStorage.getItem('userInfo');
+            if (user_info) {
+                this.userInfo = JSON.parse(user_info);
+                return;
+            }
+            this.$message.warning('请先登录');
+            window.location.href = '/login';
+        },
+        loadCheckoutData() {
+            const items = JSON.parse(localStorage.getItem('selectedCartItems') || '[]');
+            if (items.length === 0) {
+                this.$message.warning('请先选择要结算的商品');
+                this.goBack();
+                return;
+            }
+            this.checkoutItems = items;
+        },
+        async loadAddresses() {
+            try {
+                const response = await fetch('/api/mall/address/');
+                const result = await response.json();
+                if (result.code === 200) {
+                    this.addresses = result.data || [];
+                    await this.loadDefaultAddress();
+                }
+            } catch (error) {
+                console.error('加载地址失败:', error);
+            }
+        },
+        async loadDefaultAddress() {
+            try {
+                const response = await fetch('/api/mall/address/default');
+                const result = await response.json();
+                if (result.code === 200 && result.data) {
+                    this.selectedAddress = result.data;
+                    this.tempSelectedAddress = result.data;
+                    return;
+                }
+                if (this.addresses.length > 0) {
+                    this.selectedAddress = this.addresses[0];
+                    this.tempSelectedAddress = this.addresses[0];
+                }
+            } catch (error) {
+                if (this.addresses.length > 0) {
+                    this.selectedAddress = this.addresses[0];
+                    this.tempSelectedAddress = this.addresses[0];
+                }
+            }
+        },
+        formatAddress(address) {
+            if (!address) {
+                return '';
+            }
+            return [address.province, address.city, address.district, address.address]
+                .filter(function(item) {
+                    return item;
+                })
+                .join(' ');
+        },
+        openAddressSelector() {
+            if (this.addresses.length === 0) {
+                this.goToAddressManagement();
+                return;
+            }
+            this.tempSelectedAddress = this.selectedAddress || this.addresses[0];
+            this.showAddressDialog = true;
+        },
+        confirmAddress() {
+            if (this.tempSelectedAddress) {
+                this.selectedAddress = this.tempSelectedAddress;
+                this.showAddressDialog = false;
+            }
+        },
+        goToAddressManagement() {
+            window.open('/front/mall/address.html', '_blank');
+        },
+        async submitOrder() {
+            if (!this.selectedAddress) {
+                this.$message.warning('请选择收货地址');
+                return;
+            }
+            if (!this.selectedPayment) {
+                this.$message.warning('请选择支付方式');
+                return;
+            }
+            this.submitting = true;
+            try {
+                const order_data = {
+                    items: this.checkoutItems,
+                    addressId: this.selectedAddress.id,
+                    receiverName: this.selectedAddress.name,
+                    receiverPhone: this.selectedAddress.phone,
+                    receiverProvince: this.selectedAddress.province,
+                    receiverCity: this.selectedAddress.city,
+                    receiverDistrict: this.selectedAddress.district,
+                    receiverAddress: this.selectedAddress.address,
+                    paymentMethod: this.selectedPayment,
+                    remark: this.remark,
+                    totalAmount: this.totalPrice + this.shippingFee,
+                    shippingFee: this.shippingFee
+                };
+                const response = await fetch('/api/mall/order/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(order_data)
+                });
+                const result = await response.json();
+                if (result.code === 200) {
+                    this.$message.success('订单提交成功');
+                    localStorage.removeItem('selectedCartItems');
+                    window.location.href = '/front/mall/order-detail.html?id=' + result.data.orderId;
+                    return;
+                }
+                this.$message.error(result.message || '提交订单失败');
+            } catch (error) {
+                this.$message.error('提交订单失败');
+            } finally {
+                this.submitting = false;
+            }
+        },
+        goBack() {
+            window.location.href = '/front/mall/cart.html';
+        }
+    }
+});
+</script>
+</body>
+</html>

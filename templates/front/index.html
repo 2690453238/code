@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>首页 - 管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+</head>
+<body>
+    <div id="app">
+        <front-layout :active-menu="activeMenu">
+            <!-- 轮播图区域 -->
+            <div class="banner-section">
+                <el-carousel height="500px" indicator-position="outside">
+                    <el-carousel-item>
+                        <div class="banner-item" style="background-image: url('/static/banner/1.jpg')">
+                            <div class="banner-content" v-if="false">
+                                <h2>欢迎使用管理系统</h2>
+                                <p>功能强大，操作简单</p>
+                            </div>
+                        </div>
+                    </el-carousel-item>
+                    <el-carousel-item>
+                        <div class="banner-item" style="background-image: url('/static/banner/2.jpg')">
+                            <div class="banner-content" v-if="false">
+                                <h2>多角色权限管理</h2>
+                                <p>支持管理员 、普通用户</p>
+                            </div>
+                        </div>
+                    </el-carousel-item>
+                    <el-carousel-item>
+                        <div class="banner-item" style="background-image: url('/static/banner/3.jpg')">
+                            <div class="banner-content" v-if="false">
+                                <h2>现代化界面设计</h2>
+                                <p>基于Vue.js + Element-UI</p>
+                            </div>
+                        </div>
+                    </el-carousel-item>
+                </el-carousel>
+            </div>
+
+            <!-- 公告列表区域 -->
+            <div class="announcement-section">
+                <div class="page-container">
+                    <div class="section-header">
+                        <h3>最新公告</h3>
+                        <div class="header-actions">
+                            <el-button type="text" @click="loadAnnouncements" :loading="announcementLoading">
+                                <i class="el-icon-refresh"></i> 刷新
+                            </el-button>
+                            <el-button type="primary" @click="goToAnnouncements">
+                                <i class="el-icon-more"></i> 更多公告
+                            </el-button>
+                        </div>
+                    </div>
+                    
+                    <el-card class="announcement-card" v-loading="announcementLoading">
+                        <div v-if="announcements.length === 0" class="empty-state">
+                            <i class="el-icon-info"></i>
+                            <p>暂无公告信息</p>
+                            <el-button type="primary" @click="loadAnnouncements">重新加载</el-button>
+                        </div>
+                        <div v-else>
+                            <div 
+                                v-for="(announcement, index) in announcements.slice(0, 3)" 
+                                :key="announcement.id"
+                                class="announcement-item"
+                                @click="viewAnnouncement(announcement)">
+                                <div class="announcement-content">
+                                    <div class="announcement-header">
+                                        <h4 class="announcement-title">
+                                            <span v-if="announcement.isTop" class="top-tag">置顶</span>
+                                            {{ announcement.title }}
+                                        </h4>
+                                        <div class="announcement-meta">
+                                            <span class="time">
+                                                <i class="el-icon-time"></i>
+                                                {{ announcement.createTime }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="announcement-summary" v-html="getAnnouncementSummary(announcement)"></div>
+                                    <div class="announcement-footer">
+                                        <span class="author">
+                                            <i class="el-icon-user"></i>
+                                            发布人：{{ announcement.author }}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="announcement-actions">
+                                    <i class="el-icon-arrow-right"></i>
+                                </div>
+                            </div>
+                            
+                            <!-- 更多公告提示 -->
+                            <div v-if="announcements.length > 3" class="more-announcements">
+                                <el-button type="text" @click="goToAnnouncements" class="more-btn">
+                                    <i class="el-icon-more"></i>
+                                    查看更多公告 (共{{ announcements.length }}条)
+                                </el-button>
+                            </div>
+                        </div>
+                    </el-card>
+                </div>
+            </div>
+
+            <!-- 公告详情弹窗 -->
+            <el-dialog
+                :title="dialogTitle"
+                :visible.sync="dialogVisible"
+                width="80%"
+                :before-close="handleDialogClose"
+                class="announcement-detail-dialog">
+                <div v-html="dialogContent" class="announcement-detail-content"></div>
+                <span slot="footer" class="dialog-footer">
+                    <el-button @click="dialogVisible = false">关闭</el-button>
+                </span>
+            </el-dialog>
+
+            <!-- 功能特色区域 -->
+            <div class="features-section" v-if="false">
+                <div class="page-container">
+                    <div class="section-header">
+                        <h3>功能特色</h3>
+                    </div>
+                    
+                    <el-row :gutter="20">
+                        <el-col :xs="24" :sm="12" :md="8" v-for="feature in features" :key="feature.id">
+                            <el-card class="feature-card">
+                                <div class="feature-icon">
+                                    <i :class="feature.icon"></i>
+                                </div>
+                                <h4>{{ feature.title }}</h4>
+                                <p>{{ feature.description }}</p>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                </div>
+            </div>
+        </front-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/config/theme-config.js"></script>
+    <script src="/static/js/components/layout.js"></script> 
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: '1',
+                    announcements: [],
+                    announcementLoading: false,
+                    // 弹窗相关数据
+                    dialogVisible: false,
+                    dialogTitle: '',
+                    dialogContent: '',
+                    features: [
+                        {
+                            id: 1,
+                            icon: 'el-icon-user-solid',
+                            title: '多角色管理',
+                            description: '支持管理员、普通用户等多种角色，权限分级管理'
+                        },
+                        {
+                            id: 2,
+                            icon: 'el-icon-s-platform',
+                            title: '现代化界面',
+                            description: '基于Vue.js和Element-UI构建，界面美观，操作流畅'
+                        },
+                        {
+                            id: 3,
+                            icon: 'el-icon-lock',
+                            title: '安全可靠',
+                            description: '采用Session认证机制，确保系统安全性和数据可靠性'
+                        },
+                        {
+                            id: 4,
+                            icon: 'el-icon-s-data',
+                            title: '数据管理',
+                            description: '完善的用户信息管理，支持头像上传、密码修改等功能'
+                        },
+                        {
+                            id: 5,
+                            icon: 'el-icon-mobile-phone',
+                            title: '响应式设计',
+                            description: '支持PC、平板、手机等多种设备，随时随地访问'
+                        },
+                        {
+                            id: 6,
+                            icon: 'el-icon-setting',
+                            title: '易于扩展',
+                            description: '模块化设计，便于功能扩展和二次开发'
+                        }
+                    ]
+                }
+            },
+            mounted() {
+                this.loadAnnouncements();
+            },
+            methods: {
+                loadAnnouncements() {
+                    this.announcementLoading = true;
+                    
+                    // 从后端API获取公告数据
+                    axios.get('/api/announcement/front/list', {
+                        params: { 
+                            limit: 10,
+                            page: 1
+                        }
+                    })
+                    .then(response => {
+                        if (response.data.code === 200) {
+                            this.announcements = response.data.data.rows || response.data.data || [];
+                        } else {
+                            this.$message.error(response.data.message);
+                            this.announcements = [];
+                        }
+                    })
+                    .catch(error => {
+                        console.error('加载公告失败:', error);
+                        this.$message.error('加载公告失败');
+                        this.announcements = [];
+                    })
+                    .finally(() => {
+                        this.announcementLoading = false;
+                    });
+                },
+                // 获取公告摘要（处理图片显示问题）
+                getAnnouncementSummary(announcement) {
+                    // 优先使用摘要字段
+                    if (announcement.summary) {
+                        return announcement.summary;
+                    }
+                    
+                    // 如果没有摘要，从内容中提取（去除HTML标签和图片）
+                    let content = announcement.content || '';
+                    
+                    // 移除所有HTML标签
+                    content = content.replace(/<[^>]*>/g, '');
+                    
+                    // 限制长度
+                    if (content.length > 100) {
+                        content = content.substring(0, 100) + '...';
+                    }
+                    
+                    return content;
+                },
+
+                async viewAnnouncement(announcement) {
+                    try {
+                        // 调用后端接口获取公告详情（会增加浏览次数）
+                        const response = await axios.get('/api/announcement/front/detail', {
+                            params: { id: announcement.id }
+                        });
+                        
+                        if (response.data.code === 200) {
+                            const detailData = response.data.data;
+                            
+                            // 处理内容中的图片显示
+                            let content = detailData.content || '';
+                            
+                            // 为图片添加响应式样式
+                            content = content.replace(/<img([^>]*)>/gi, '<img$1 style="max-width: 100%; height: auto; display: block; margin: 10px auto;">');
+                            
+                            // 设置弹窗数据
+                            this.dialogVisible = true;
+                            this.dialogTitle = detailData.title;
+                            this.dialogContent = content;
+                            
+                            // 更新本地数据中的浏览次数
+                            const index = this.announcements.findIndex(item => item.id === announcement.id);
+                            if (index !== -1) {
+                                this.announcements[index].viewCount = detailData.viewCount;
+                            }
+                        } else {
+                            this.$message.error(response.data.message || '获取公告详情失败');
+                        }
+                    } catch (error) {
+                        console.error('获取公告详情失败:', error);
+                        this.$message.error('获取公告详情失败');
+                        
+                        // 如果接口调用失败，仍然显示本地数据
+                        let content = announcement.content || '';
+                        content = content.replace(/<img([^>]*)>/gi, '<img$1 style="max-width: 100%; height: auto; display: block; margin: 10px auto;">');
+                        
+                        this.dialogVisible = true;
+                        this.dialogTitle = announcement.title;
+                        this.dialogContent = content;
+                    }
+                },
+                goToAnnouncements() {
+                    window.location.href = '/front/announcements.html';
+                },
+                handleDialogClose() {
+                    this.dialogVisible = false;
+                }
+            }
+        });
+    </script>
+
+    <style scoped>
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .section-header h3 {
+            color: #e8a81a;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .announcement-card {
+            margin-bottom: 30px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #64748b;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #cbd5e1;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        .announcement-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .announcement-item:hover {
+            background-color: #f8fafc;
+            transform: translateX(5px);
+        }
+
+        .announcement-item:last-child {
+            border-bottom: none;
+        }
+
+        .announcement-content {
+            flex: 1;
+        }
+
+        .announcement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .announcement-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.4;
+        }
+
+        .top-tag {
+            display: inline-block;
+            background: linear-gradient(45deg, #ef4444, #f87171);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+
+        .announcement-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .announcement-meta i {
+            margin-right: 4px;
+        }
+
+        .announcement-summary {
+            margin: 0 0 10px 0;
+            color: #64748b;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .announcement-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .author {
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .author i {
+            margin-right: 4px;
+        }
+
+        .announcement-actions {
+            margin-left: 20px;
+            color: #94a3b8;
+            font-size: 18px;
+        }
+
+        .more-announcements {
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background-color: #f8fafc;
+        }
+
+        .more-btn {
+            font-size: 16px;
+            color: #e8a81a;
+            font-weight: 500;
+        }
+
+        .more-btn:hover {
+            color: #96281b;
+        }
+
+        @media (max-width: 768px) {
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+            }
+
+            .header-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+
+            .announcement-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .announcement-meta {
+                margin-top: 8px;
+            }
+
+            .announcement-item {
+                padding: 15px;
+            }
+        }
+        
+        /* 公告详情弹窗样式 */
+        .announcement-detail-dialog .el-dialog {
+            max-width: 1000px !important;
+            min-width: 600px !important;
+        }
+        
+        .announcement-detail-dialog .el-dialog__body {
+            max-height: 70vh !important;
+            overflow-y: auto !important;
+            padding: 20px !important;
+        }
+        
+        .announcement-detail-content {
+            line-height: 1.6 !important;
+            font-size: 16px !important;
+        }
+        
+        .announcement-detail-content img {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            margin: 15px auto !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .announcement-detail-content p {
+            margin: 15px 0 !important;
+        }
+        
+        .announcement-detail-content h1,
+        .announcement-detail-content h2,
+        .announcement-detail-content h3 {
+            margin: 20px 0 15px 0 !important;
+            font-weight: 600 !important;
+            color: #1e293b !important;
+        }
+        
+        .announcement-detail-content h1 {
+            font-size: 22px !important;
+        }
+        
+        .announcement-detail-content h2 {
+            font-size: 20px !important;
+        }
+        
+        .announcement-detail-content h3 {
+            font-size: 18px !important;
+        }
+        
+        .announcement-detail-content ul,
+        .announcement-detail-content ol {
+            margin: 15px 0 !important;
+            padding-left: 30px !important;
+        }
+        
+        .announcement-detail-content li {
+            margin: 8px 0 !important;
+        }
+        
+        .announcement-detail-content blockquote {
+            border-left: 4px solid #e8a81a !important;
+            background: #fdf5f5 !important;
+            padding: 15px 20px !important;
+            margin: 20px 0 !important;
+            border-radius: 0 4px 4px 0 !important;
+        }
+        
+        .announcement-detail-content code {
+            background: #f1f5f9 !important;
+            padding: 2px 6px !important;
+            border-radius: 3px !important;
+            font-family: 'Courier New', monospace !important;
+            font-size: 14px !important;
+        }
+        
+        .announcement-detail-content pre {
+            background: #f8fafc !important;
+            padding: 15px !important;
+            border-radius: 6px !important;
+            overflow-x: auto !important;
+            margin: 15px 0 !important;
+        }
+        
+        .announcement-detail-content pre code {
+            background: none !important;
+            padding: 0 !important;
+        }
+         
+    </style>
+</body>
+</html>

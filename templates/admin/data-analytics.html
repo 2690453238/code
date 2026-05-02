@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>平台销量预测看板</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        body { background: #f5f7fb; }
+        .page-wrap { padding: 20px; }
+        .hero {
+            padding: 24px 28px;
+            border-radius: 18px;
+            color: #fff;
+            background: linear-gradient(135deg, #0f766e, #1d4ed8 58%, #4338ca);
+            box-shadow: 0 18px 40px rgba(29, 78, 216, 0.18);
+        }
+        .hero h2 { margin: 0 0 8px; font-size: 28px; }
+        .hero p { margin: 0; opacity: 0.92; }
+        .toolbar { margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .form-help { margin-top: 12px; color: rgba(255, 255, 255, 0.88); font-size: 13px; line-height: 1.8; }
+        .form-help span { margin-right: 18px; }
+        .metric-row { margin-top: 20px; }
+        .metric-card { border: none; border-radius: 16px; overflow: hidden; }
+        .metric-box { padding: 18px 20px; min-height: 112px; }
+        .metric-label { color: #64748b; font-size: 13px; }
+        .metric-value { margin-top: 10px; font-size: 30px; font-weight: 700; color: #0f172a; }
+        .metric-sub { margin-top: 8px; color: #475569; font-size: 13px; }
+        .chart-card { margin-top: 20px; border-radius: 16px; }
+        .chart-title { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+        .metric-list { margin: 0; padding: 0; list-style: none; }
+        .metric-list li { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eef2f7; }
+        .metric-list li:last-child { border-bottom: none; }
+        .soft-tag { margin-left: 8px; }
+        .table-note { color: #64748b; font-size: 12px; margin-top: 8px; }
+        .explain-card { margin-top: 20px; border-radius: 16px; }
+        .explain-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .explain-block { padding: 14px 16px; background: #f8fafc; border-radius: 8px; }
+        .explain-title { margin-bottom: 8px; font-weight: 700; color: #0f172a; }
+        .explain-text { color: #475569; font-size: 13px; line-height: 1.8; }
+        @media (max-width: 768px) {
+            .explain-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <admin-layout :active-menu="activeMenu">
+        <template #content>
+            <div class="page-wrap" v-loading="pageLoading">
+                <div class="hero">
+                    <h2>平台运营者销量预测看板</h2>
+                    <p>训练平台级销量预测模型，评估未来销量并观察全局销售趋势。</p>
+                    <div class="toolbar">
+                        <el-input-number v-model="forecastDays" :min="3" :max="30"  label="预测天数"></el-input-number>
+                        <el-input-number v-model="testDays" :min="7" :max="30" label="评估天数"></el-input-number>
+                        <el-button type="primary" icon="el-icon-cpu" :loading="trainLoading" @click="trainModel">训练模型</el-button>
+                        <el-tooltip content="不重新训练模型，按当前参数重新获取预测、评估和图表数据" placement="top">
+                            <el-button icon="el-icon-refresh" @click="loadAll">刷新结果</el-button>
+                        </el-tooltip>
+                        <el-tag type="success" v-if="dashboard.overview.trainedAt" class="soft-tag">
+                            最近训练：{{ dashboard.overview.trainedAt }}
+                        </el-tag>
+                    </div>
+                    <div class="form-help">
+                        <span>预测天数：从今天起向后预测的天数，影响图表和商品预测汇总。</span>
+                        <span>评估天数：从历史末尾划出多少天做测试集，影响 RMSE、MAE、MAPE、R²。</span>
+                        <span>训练模型：重新训练并保存模型；刷新结果：复用已保存模型和当日预测缓存重新展示。</span>
+                    </div>
+                </div>
+
+                <el-row :gutter="16" class="metric-row">
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="metric-card">
+                            <div class="metric-box">
+                                <div class="metric-label">覆盖商品数</div>
+                                <div class="metric-value">{{ dashboard.overview.productCount || 0 }}</div>
+                                <div class="metric-sub">训练范围：{{ dashboard.overview.scopeName || '全平台' }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="metric-card">
+                            <div class="metric-box">
+                                <div class="metric-label">近 7 天实际销量</div>
+                                <div class="metric-value">{{ numFmt(dashboard.overview.last7DaysSales) }}</div>
+                                <div class="metric-sub">历史总销量：{{ numFmt(dashboard.overview.historyTotal) }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="metric-card">
+                            <div class="metric-box">
+                                <div class="metric-label">未来 7 天预测销量</div>
+                                <div class="metric-value">{{ numFmt(dashboard.overview.next7DaysForecast) }}</div>
+                                <div class="metric-sub">预测总量：{{ numFmt(dashboard.overview.forecastTotal) }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="metric-card">
+                            <div class="metric-box">
+                                <div class="metric-label">模型评估</div>
+                                <div class="metric-value">{{ dashboard.metrics.mape || 0 }}%</div>
+                                <div class="metric-sub">MAPE 越低越好</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-row :gutter="16">
+                    <el-col :xs="24" :lg="16">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>全局销售趋势与预测</span>
+                                <el-tag size="mini" type="info">历史 + 未来 {{ forecastDays }} 天</el-tag>
+                            </div>
+                            <div id="trendChart" style="height: 360px;"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="8">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>模型评估指标</span>
+                            </div>
+                            <ul class="metric-list">
+                                <li><span>RMSE</span><strong>{{ dashboard.metrics.rmse || 0 }}</strong></li>
+                                <li><span>MAE</span><strong>{{ dashboard.metrics.mae || 0 }}</strong></li>
+                                <li><span>MAPE</span><strong>{{ dashboard.metrics.mape || 0 }}%</strong></li>
+                                <li><span>R²</span><strong>{{ dashboard.metrics.r2 || 0 }}</strong></li>
+                                <li><span>训练区间</span><strong>{{ evaluation.trainDateRange.start || '-' }}</strong></li>
+                                <li><span>测试区间</span><strong>{{ evaluation.testDateRange.start || '-' }}</strong></li>
+                            </ul>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-card class="explain-card" v-show="false">
+                    <div slot="header" class="chart-title">
+                        <span>参数说明</span>
+                        <el-tag size="mini" type="success">预测从今天开始</el-tag>
+                    </div>
+                    <div class="explain-grid">
+                        <div class="explain-block">
+                            <div class="explain-title">预测天数</div>
+                            <div class="explain-text">
+                                控制从今天起向后预测的天数，例如 7 表示预测今天至未来第 7 天的销量，销量按整数件数展示。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">评估天数</div>
+                            <div class="explain-text">
+                                从历史数据末尾切出最近若干天作为测试集，用于计算模型误差，不参与训练。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">模型指标</div>
+                            <div class="explain-text">
+                                RMSE、MAE、MAPE 表示预测误差，数值越低越好；R² 越接近 1 说明拟合效果越好。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">采购建议</div>
+                            <div class="explain-text">
+                                基于预测销量、当前库存和 15% 安全库存计算建议采购量，并给出库存风险等级。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">模型特征</div>
+                            <div class="explain-text">
+                                综合历史销量滞后值、7 日均值、14 日累计、季节、周末、节假日、价格、库存和促销折扣。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">日期口径</div>
+                            <div class="explain-text">
+                                预测结果固定从系统当天开始；若样例库中存在今天之后的订单，会在预测时排除，避免使用未来数据。
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+
+                <el-row :gutter="16">
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>品类预测分布</span>
+                            </div>
+                            <div id="categoryChart" style="height: 320px;"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>社区团长预测对比</span>
+                            </div>
+                            <div id="supplierChart" style="height: 320px;"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-card class="chart-card">
+                    <div slot="header" class="chart-title">
+                        <span>批量预测结果</span>
+                        <el-tag size="mini" type="warning">按商品汇总</el-tag>
+                    </div>
+                    <el-table :data="batchData.productPredictions" stripe>
+                        <el-table-column prop="productName" label="商品名称" min-width="220"></el-table-column>
+                        <el-table-column prop="supplierName" label="社区团长" min-width="160"></el-table-column>
+                        <el-table-column prop="categoryName" label="品类" width="120"></el-table-column>
+                        <el-table-column prop="forecastQuantity" label="预测销量" width="120" align="right"></el-table-column>
+                        <el-table-column prop="currentStock" label="当前库存" width="120" align="right"></el-table-column>
+                        <el-table-column prop="safetyStock" label="安全库存" width="120" align="right"></el-table-column>
+                        <el-table-column label="建议采购" width="120" align="right">
+                            <template slot-scope="scope">
+                                {{ scope.row.purchaseAdvice ? scope.row.purchaseAdvice.suggestedQuantity : 0 }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="库存风险" width="110" align="center">
+                            <template slot-scope="scope">
+                                <el-tag :type="riskTagType(scope.row.purchaseAdvice)" size="mini">
+                                    {{ riskText(scope.row.purchaseAdvice) }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                    <div class="table-note">展示预测销量最高的前 50 个商品。</div>
+                </el-card>
+            </div>
+        </template>
+    </admin-layout>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/echarts.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            activeMenu: 'operator-sales-forecast',
+            pageLoading: false,
+            trainLoading: false,
+            forecastDays: 7,
+            testDays: 14,
+            dashboard: {
+                overview: {},
+                trend: { historyDates: [], historySales: [], forecastDates: [], forecastSales: [] },
+                categoryForecast: [],
+                supplierForecast: [],
+                topProducts: [],
+                metrics: {}
+            },
+            evaluation: { trainDateRange: {}, testDateRange: {}, metrics: {} },
+            batchData: { productPredictions: [] },
+            charts: {}
+        };
+    },
+    mounted() {
+        this.loadAll();
+        window.addEventListener('resize', this.resizeCharts);
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.resizeCharts);
+    },
+    methods: {
+        getParams() {
+            return { forecastDays: this.forecastDays, testDays: this.testDays, trendDays: 30 };
+        },
+        async loadAll() {
+            this.pageLoading = true;
+            try {
+                const [dashboardRes, evalRes, batchRes] = await Promise.all([
+                    axios.get('/api/analytics/forecast/sales/dashboard', { params: this.getParams() }),
+                    axios.get('/api/analytics/forecast/sales/evaluation', { params: this.getParams() }),
+                    axios.get('/api/analytics/forecast/sales/batch', { params: this.getParams() })
+                ]);
+                if (dashboardRes.data.code === 200) {
+                    this.dashboard = dashboardRes.data.data;
+                }
+                if (evalRes.data.code === 200) {
+                    this.evaluation = evalRes.data.data;
+                }
+                if (batchRes.data.code === 200) {
+                    this.batchData = batchRes.data.data;
+                }
+                this.$nextTick(this.renderCharts);
+            } catch (error) {
+                this.$message.error('加载平台销量预测看板失败');
+            } finally {
+                this.pageLoading = false;
+            }
+        },
+        async trainModel() {
+            this.trainLoading = true;
+            try {
+                const response = await axios.post('/api/analytics/forecast/sales/train', null, { params: this.getParams() });
+                if (response.data.code !== 200) {
+                    this.$message.error(response.data.message || '训练失败');
+                    return;
+                }
+                this.$message.success('模型训练完成');
+                await this.loadAll();
+            } catch (error) {
+                this.$message.error('训练销量预测模型失败');
+            } finally {
+                this.trainLoading = false;
+            }
+        },
+        getChart(id) {
+            const el = document.getElementById(id);
+            if (!el) {
+                return null;
+            }
+            if (!this.charts[id]) {
+                this.charts[id] = echarts.init(el);
+            }
+            return this.charts[id];
+        },
+        renderCharts() {
+            this.renderTrendChart();
+            this.renderCategoryChart();
+            this.renderSupplierChart();
+        },
+        renderTrendChart() {
+            const chart = this.getChart('trendChart');
+            if (!chart) {
+                return;
+            }
+            const trend = this.dashboard.trend || {};
+            const historyDates = trend.historyDates || [];
+            const forecastDates = trend.forecastDates || [];
+            const xAxisData = historyDates.concat(forecastDates);
+            const historySales = (trend.historySales || []).concat(new Array(forecastDates.length).fill(null));
+            const forecastSales = new Array(historyDates.length).fill(null).concat(trend.forecastSales || []);
+            chart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['历史销量', '预测销量'] },
+                grid: { left: 40, right: 20, top: 40, bottom: 30 },
+                xAxis: { type: 'category', data: xAxisData, boundaryGap: false },
+                yAxis: { type: 'value', name: '销量' },
+                series: [
+                    {
+                        name: '历史销量',
+                        type: 'line',
+                        smooth: true,
+                        data: historySales,
+                        lineStyle: { width: 3, color: '#2563eb' },
+                        itemStyle: { color: '#2563eb' }
+                    },
+                    {
+                        name: '预测销量',
+                        type: 'line',
+                        smooth: true,
+                        data: forecastSales,
+                        lineStyle: { width: 3, type: 'dashed', color: '#f97316' },
+                        itemStyle: { color: '#f97316' }
+                    }
+                ]
+            });
+        },
+        renderCategoryChart() {
+            const chart = this.getChart('categoryChart');
+            if (!chart) {
+                return;
+            }
+            chart.setOption({
+                tooltip: { trigger: 'item' },
+                series: [{
+                    type: 'pie',
+                    radius: ['38%', '68%'],
+                    data: (this.dashboard.categoryForecast || []).map(item => ({
+                        name: item.category,
+                        value: item.quantity
+                    }))
+                }]
+            });
+        },
+        renderSupplierChart() {
+            const chart = this.getChart('supplierChart');
+            if (!chart) {
+                return;
+            }
+            const data = this.dashboard.supplierForecast || [];
+            chart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                grid: { left: 50, right: 20, top: 20, bottom: 50 },
+                xAxis: {
+                    type: 'category',
+                    data: data.map(item => item.supplier),
+                    axisLabel: { rotate: 18 }
+                },
+                yAxis: { type: 'value', name: '预测销量' },
+                series: [{
+                    type: 'bar',
+                    barMaxWidth: 48,
+                    data: data.map(item => item.quantity),
+                    itemStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#14b8a6' },
+                            { offset: 1, color: '#2563eb' }
+                        ])
+                    }
+                }]
+            });
+        },
+        resizeCharts() {
+            Object.keys(this.charts).forEach(key => {
+                if (this.charts[key]) {
+                    this.charts[key].resize();
+                }
+            });
+        },
+        riskTagType(advice) {
+            const level = advice ? advice.riskLevel : 'low';
+            const map = { high: 'danger', medium: 'warning', low: 'success' };
+            return map[level] || 'info';
+        },
+        riskText(advice) {
+            const level = advice ? advice.riskLevel : 'low';
+            const map = { high: '高风险', medium: '需补货', low: '充足' };
+            return map[level] || '未知';
+        },
+        numFmt(value) {
+            return Number(value || 0).toFixed(2);
+        }
+    }
+});
+</script>
+</body>
+</html>

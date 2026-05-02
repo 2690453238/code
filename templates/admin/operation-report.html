@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>运营统计报告 - 后台管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        .report-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }
+        .page-header { margin-bottom: 24px; }
+        .page-header h2 { margin: 0 0 4px; font-size: 24px; font-weight: 700; color: #1a1a2e; }
+        .page-header p  { margin: 0; color: #909399; font-size: 14px; }
+        .section-title {
+            font-size: 17px; font-weight: 700; color: #1a1a2e;
+            margin: 28px 0 16px; padding: 0 0 10px;
+            border-bottom: 3px solid #409eff;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-title i { color: #409eff; font-size: 20px; }
+        .kpi-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+        .kpi-card {
+            flex: 1; min-width: 150px; border-radius: 12px; padding: 20px 22px;
+            color: #fff; position: relative; overflow: hidden;
+        }
+        .kpi-card::after {
+            content: ''; position: absolute; right: -18px; top: -18px;
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+        }
+        .kpi-card .kpi-num  { font-size: 30px; font-weight: 800; line-height: 1.1; }
+        .kpi-card .kpi-sub  { font-size: 13px; opacity: .85; margin-top: 6px; }
+        .kpi-card .kpi-icon { font-size: 36px; position: absolute; right: 22px; top: 18px; opacity: .3; }
+        .kc1 { background: linear-gradient(135deg,#6a11cb,#2575fc); }
+        .kc2 { background: linear-gradient(135deg,#f7971e,#ffd200); }
+        .kc3 { background: linear-gradient(135deg,#11998e,#38ef7d); }
+        .kc4 { background: linear-gradient(135deg,#c94b4b,#4b134f); }
+        .chart-card { border-radius: 10px; margin-bottom: 20px; }
+        .chart-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: 700; font-size: 15px; color: #303133;
+        }
+        .chart-box { height: 360px; }
+        .chart-box-sm { height: 280px; }
+        .tag-cloud { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+        .tag-item {
+            padding: 5px 14px; border-radius: 20px;
+            font-size: 13px; font-weight: 600; cursor: default;
+            transition: transform .2s;
+        }
+        .tag-item:hover { transform: scale(1.08); }
+        .competition-table .el-table { border-radius: 8px; overflow: hidden; }
+        .good-rate-ring { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        .good-rate-ring .rate-num { font-size: 48px; font-weight: 800; color: #67c23a; line-height: 1; }
+        .good-rate-ring .rate-label { font-size: 14px; color: #909399; margin-top: 6px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <admin-layout :active-menu="activeMenu">
+        <template #content>
+            <div class="report-container" v-loading="pageLoading">
+
+                <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <div>
+                        <h2><i class="el-icon-s-marketing" style="color:#409eff"></i> 运营统计报告</h2>
+                        <p>商品分布 · 价格区间 · 用户评价 · 品类竞争格局</p>
+                    </div>
+                </div>
+
+                <!-- ===== 第一节：商品分布与价格区间 ===== -->
+                <div class="section-title">
+                    <i class="el-icon-goods"></i> 商品分布与价格区间分析
+                </div>
+
+                <!-- KPI -->
+                <div class="kpi-row">
+                    <div class="kpi-card kc1">
+                        <i class="el-icon-goods kpi-icon"></i>
+                        <div class="kpi-num">{{ ppd.totalProducts }}</div>
+                        <div class="kpi-sub">在售商品总数</div>
+                    </div>
+                    <div class="kpi-card kc2">
+                        <i class="el-icon-menu kpi-icon"></i>
+                        <div class="kpi-num">{{ ppd.categoryCount }}</div>
+                        <div class="kpi-sub">活跃品类数</div>
+                    </div>
+                    <div class="kpi-card kc3">
+                        <i class="el-icon-coin kpi-icon"></i>
+                        <div class="kpi-num">¥{{ ppd.overallAvgPrice }}</div>
+                        <div class="kpi-sub">全场均价</div>
+                    </div>
+                    <div class="kpi-card kc4">
+                        <i class="el-icon-s-flag kpi-icon"></i>
+                        <div class="kpi-num">{{ ppd.topCategory }}</div>
+                        <div class="kpi-sub">商品最多品类</div>
+                    </div>
+                </div>
+
+                <el-row :gutter="20">
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header">
+                                <span>各品类商品数量分布</span>
+                                <el-button type="text" @click="loadProductPrice"><i class="el-icon-refresh"></i></el-button>
+                            </div>
+                            <div id="categoryDistChart" class="chart-box"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header">
+                                <span>价格区间商品数量分布</span>
+                            </div>
+                            <div id="priceRangeChart" class="chart-box"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+                <el-row :gutter="20">
+                    <el-col :xs="24">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header">
+                                <span>热销商品 价格 / 销量 / 库存气泡图（Top 20）</span>
+                            </div>
+                            <div id="bubbleChart" style="height:400px"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <div class="section-title" v-show="false">
+                    <i class="el-icon-chat-dot-round"></i> 用户评价汇总分析
+                </div>
+
+                <el-row :gutter="20" v-show="false">
+                    <el-col :xs="24" :sm="8">
+                        <el-card class="chart-card" style="height:320px">
+                            <div slot="header" class="chart-header"><span>好评率</span></div>
+                            <div class="good-rate-ring">
+                                <div id="goodRateChart" style="width:180px;height:180px;margin:0 auto"></div>
+                                <div style="margin-top:12px;color:#606266;font-size:13px">共 {{ rs.totalReviews }} 条评价</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="16">
+                        <el-card class="chart-card" style="height:320px">
+                            <div slot="header" class="chart-header"><span>评分星级分布</span></div>
+                            <div id="ratingDistChart" style="height:250px"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+                <el-row :gutter="20" v-show="false">
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header"><span>各品类平均评分</span></div>
+                            <div id="categoryRatingChart" class="chart-box"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="12">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header"><span>高频评价词条 Top 30</span></div>
+                            <div style="padding:12px 4px">
+                                <div v-if="rs.topTags.length === 0" style="text-align:center;color:#c0c4cc;padding:60px 0">
+                                    暂无词条数据（请先导入 py_product_review_tags 表数据）
+                                </div>
+                                <div v-else class="tag-cloud">
+                                    <span v-for="tag in rs.topTags" :key="tag.name"
+                                        class="tag-item"
+                                        :style="tagStyle(tag)">
+                                        {{ tag.name }}
+                                        <span style="opacity:.7;font-size:11px">×{{ tag.value }}</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <!-- ===== 第三节：品类竞争格局 ===== -->
+                <div class="section-title" >
+                    <i class="el-icon-trophy"></i> 各品类竞争格局分析
+                </div>
+
+                <el-row :gutter="20">
+                    <el-col :xs="24" :lg="14">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header"><span>品类销售额与订单量（近30天）</span></div>
+                            <div id="competitionChart" class="chart-box"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="10">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-header"><span>品类综合雷达（均价·销量·评分）</span></div>
+                            <div id="radarChart" class="chart-box"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-card class="chart-card competition-table" v-show="false">
+                    <div slot="header" class="chart-header"><span>品类竞争力明细表</span></div>
+                    <el-table :data="cc.competition" stripe border style="width:100%" size="small">
+                        <el-table-column type="index" label="#" width="50" align="center"></el-table-column>
+                        <el-table-column prop="category"  label="品类" min-width="100"></el-table-column>
+                        <el-table-column prop="productCount" label="商品数" width="90"  align="center"></el-table-column>
+                        <el-table-column prop="supplierCount" label="商家数" width="90"  align="center"></el-table-column>
+                        <el-table-column prop="orderCount"  label="订单数" width="90"  align="center"></el-table-column>
+                        <el-table-column prop="quantity"   label="销售量" width="90"  align="center"></el-table-column>
+                        <el-table-column label="销售额" width="120" align="right">
+                            <template slot-scope="s">
+                                <span style="color:#409eff;font-weight:700">¥{{ s.row.revenue.toLocaleString() }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="竞争指数" width="120" align="center">
+                            <template slot-scope="s">
+                                <el-progress :percentage="compIndex(s.row)" :color="compColor(s.row)"
+                                    :stroke-width="10" :show-text="false"></el-progress>
+                                <span style="font-size:12px;color:#606266">{{ compIndex(s.row) }}</span>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+
+            </div>
+        </template>
+    </admin-layout>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<!-- PLACEHOLDER_SCRIPT -->
+<script>
+const PALETTE = ['#6a11cb','#2575fc','#f7971e','#11998e','#c94b4b','#4b134f','#38ef7d','#ffd200','#a18cd1','#fbc2eb','#84fab0','#8fd3f4'];
+const TAG_COLORS = { quality:'#67c23a', logistics:'#409eff', package:'#e6a23c', price:'#f56c6c', effect:'#9b59b6', service:'#1abc9c', other:'#95a5a6' };
+
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            activeMenu: 'operation-report',
+            pageLoading: false,
+            hdfsLoading: false,
+            ppd: { totalProducts: 0, categoryCount: 0, overallAvgPrice: 0, topCategory: '-', categoryDist: [], priceRanges: [], bubbleData: [] },
+            rs:  { totalReviews: 0, goodRate: 0, ratingDist: [], categoryRatings: [], topTags: [], monthly: [] },
+            cc:  { competition: [], radarData: [] },
+            charts: {}
+        };
+    },
+    mounted() {
+        this.pageLoading = true;
+        Promise.all([
+            this.loadProductPrice(),
+            this.loadReviewSummary(),
+            this.loadCategoryCompetition()
+        ]).finally(() => { this.pageLoading = false; });
+    },
+    methods: {
+        loadProductPrice() {
+            return axios.get('/api/analytics/report/product-price').then(res => {
+                if (res.data.code !== 200) return;
+                const d = res.data.data;
+                this.ppd.categoryDist  = d.categoryDist  || [];
+                this.ppd.priceRanges   = d.priceRanges   || [];
+                this.ppd.bubbleData    = d.bubbleData    || [];
+                this.ppd.totalProducts = this.ppd.categoryDist.reduce((s,c) => s + c.value, 0);
+                this.ppd.categoryCount = this.ppd.categoryDist.length;
+                const allPrices = this.ppd.categoryDist.filter(c => c.avgPrice);
+                this.ppd.overallAvgPrice = allPrices.length
+                    ? (allPrices.reduce((s,c) => s + c.avgPrice, 0) / allPrices.length).toFixed(1) : 0;
+                this.ppd.topCategory = this.ppd.categoryDist[0] ? this.ppd.categoryDist[0].name : '-';
+                this.$nextTick(() => {
+                    this.renderCategoryDist();
+                    this.renderPriceRange();
+                    this.renderBubble();
+                });
+            }).catch(() => this.$message.error('商品分布数据加载失败'));
+        },
+        loadReviewSummary() {
+            return axios.get('/api/analytics/report/review-summary').then(res => {
+                if (res.data.code !== 200) return;
+                const d = res.data.data;
+                this.rs.totalReviews    = d.totalReviews    || 0;
+                this.rs.goodRate        = d.goodRate        || 0;
+                this.rs.ratingDist      = d.ratingDist      || [];
+                this.rs.categoryRatings = d.categoryRatings || [];
+                this.rs.topTags         = d.topTags         || [];
+                this.rs.monthly         = d.monthly         || [];
+                this.$nextTick(() => {
+                    this.renderGoodRate();
+                    this.renderRatingDist();
+                    this.renderCategoryRating();
+                });
+            }).catch(() => this.$message.error('评价数据加载失败'));
+        },
+        loadCategoryCompetition() {
+            return axios.get('/api/analytics/report/category-competition').then(res => {
+                if (res.data.code !== 200) return;
+                const d = res.data.data;
+                this.cc.competition = d.competition || [];
+                this.cc.radarData   = d.radarData   || [];
+                this.$nextTick(() => {
+                    this.renderCompetition();
+                    this.renderRadar();
+                });
+            }).catch(() => this.$message.error('品类竞争数据加载失败'));
+        },
+
+        /* ---- ECharts 渲染 ---- */
+        getChart(id) {
+            const el = document.getElementById(id);
+            if (!el) return null;
+            return this.charts[id] || (this.charts[id] = echarts.init(el));
+        },
+        renderCategoryDist() {
+            const c = this.getChart('categoryDistChart'); if (!c) return;
+            const data = this.ppd.categoryDist.map(d => ({ name: d.name, value: d.value }));
+            c.setOption({ tooltip: { trigger: 'item', formatter: '{b}: {c} 件 ({d}%)' },
+                legend: { orient: 'vertical', left: 10, top: 'middle', itemWidth: 12 },
+                series: [{ type: 'pie', radius: ['38%','70%'], center: ['60%','50%'],
+                    data, itemStyle: { borderRadius: 6, borderWidth: 2, borderColor: '#fff' },
+                    label: { show: false }, emphasis: { label: { show: true, fontSize: 14, fontWeight: 700 } }
+                }]
+            });
+        },
+        renderPriceRange() {
+            const c = this.getChart('priceRangeChart'); if (!c) return;
+            const cats = this.ppd.priceRanges.map(d => d.range);
+            const vals = this.ppd.priceRanges.map(d => d.count);
+            c.setOption({
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: cats, axisLabel: { rotate: 15, fontSize: 12 } },
+                yAxis: { type: 'value', name: '商品数' },
+                series: [{ type: 'bar', data: vals, barMaxWidth: 60,
+                    itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+                        [{ offset:0, color:'#667eea' }, { offset:1, color:'#764ba2' }]) ,
+                        borderRadius: [6,6,0,0] },
+                    label: { show: true, position: 'top', color: '#606266' }
+                }]
+            });
+        },
+        renderBubble() {
+            const c = this.getChart('bubbleChart'); if (!c) return;
+            const series = {};
+            this.ppd.bubbleData.forEach(d => {
+                if (!series[d.category]) series[d.category] = [];
+                series[d.category].push([d.price, d.sales, Math.max(10, Math.sqrt(d.stock + 1) * 5), d.name]);
+            });
+            const cats = Object.keys(series);
+            c.setOption({
+                tooltip: { formatter: p => `${p.data[3]}<br/>价格: ¥${p.data[0]}<br/>销量: ${p.data[1]}<br/>库存: ${Math.round(p.data[2] * p.data[2] / 25)}` },
+                legend: { data: cats, top: 0 },
+                xAxis: { type: 'value', name: '价格(¥)', scale: true },
+                yAxis: { type: 'value', name: '销量', scale: true },
+                series: cats.map((cat, i) => ({
+                    name: cat, type: 'scatter',
+                    symbolSize: d => d[2],
+                    data: series[cat],
+                    itemStyle: { color: PALETTE[i % PALETTE.length], opacity: 0.75 }
+                }))
+            });
+        },
+        renderGoodRate() {
+            const c = this.getChart('goodRateChart'); if (!c) return;
+            const rate = this.rs.goodRate;
+            c.setOption({
+                series: [{ type: 'gauge', startAngle: 180, endAngle: 0,
+                    min: 0, max: 100, radius: '100%',
+                    pointer: { show: false },
+                    progress: { show: true, overlap: false, roundCap: true, clip: false,
+                        itemStyle: { color: rate >= 80 ? '#67c23a' : rate >= 60 ? '#e6a23c' : '#f56c6c' } },
+                    axisLine: { lineStyle: { width: 18 } },
+                    splitLine: { show: false }, axisTick: { show: false }, axisLabel: { show: false },
+                    data: [{ value: rate, detail: { offsetCenter: ['0%','-10%'], fontSize: 28, fontWeight: 800,
+                        formatter: '{value}%', color: '#303133' } }],
+                    title: { offsetCenter: ['0%','20%'], fontSize: 13, color: '#909399' },
+                    detail: {}
+                }]
+            });
+        },
+        renderRatingDist() {
+            const c = this.getChart('ratingDistChart'); if (!c) return;
+            const stars = ['1星','2星','3星','4星','5星'];
+            const vals  = this.rs.ratingDist.map(d => d.count);
+            c.setOption({
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'category', data: stars },
+                yAxis: { type: 'value', name: '评价数' },
+                series: [{ type: 'bar', data: vals.map((v,i) => ({
+                    value: v,
+                    itemStyle: { color: ['#f56c6c','#e6a23c','#ffd200','#95d475','#67c23a'][i], borderRadius: [4,4,0,0] }
+                })),
+                    barMaxWidth: 50,
+                    label: { show: true, position: 'top', color: '#606266' }
+                }]
+            });
+        },
+        renderCategoryRating() {
+            const c = this.getChart('categoryRatingChart'); if (!c) return;
+            const cats = this.rs.categoryRatings.map(d => d.category);
+            const avgs = this.rs.categoryRatings.map(d => d.avgRating);
+            const cnts = this.rs.categoryRatings.map(d => d.reviewCount);
+            c.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { data: ['平均评分','评价数量'], top: 0 },
+                xAxis: { type: 'category', data: cats, axisLabel: { rotate: 20, fontSize: 11 } },
+                yAxis: [{ type: 'value', name: '平均评分', min: 0, max: 5 },
+                        { type: 'value', name: '评价数', position: 'right' }],
+                series: [
+                    { name: '平均评分', type: 'bar', data: avgs, barMaxWidth: 40, yAxisIndex: 0,
+                      itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+                          [{ offset:0,color:'#f7971e'},{offset:1,color:'#ffd200'}]), borderRadius:[4,4,0,0] },
+                      label: { show: true, position: 'top', formatter: v => v.data.toFixed(1) } },
+                    { name: '评价数量', type: 'line', data: cnts, yAxisIndex: 1,
+                      smooth: true, lineStyle: { color:'#409eff' },
+                      itemStyle: { color:'#409eff' }, symbol: 'circle', symbolSize: 7 }
+                ]
+            });
+        },
+        renderCompetition() {
+            const c = this.getChart('competitionChart'); if (!c) return;
+            const data = this.cc.competition.slice(0, 12);
+            const cats = data.map(d => d.category);
+            c.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { data: ['销售额(¥)','订单数'], top: 0 },
+                xAxis: { type: 'category', data: cats, axisLabel: { rotate: 20, fontSize: 11 } },
+                yAxis: [{ type: 'value', name: '销售额(¥)' }, { type: 'value', name: '订单数', position: 'right' }],
+                series: [
+                    { name: '销售额(¥)', type: 'bar', data: data.map(d => d.revenue), barMaxWidth: 40, yAxisIndex: 0,
+                      itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,
+                          [{offset:0,color:'#6a11cb'},{offset:1,color:'#2575fc'}]), borderRadius:[4,4,0,0] } },
+                    { name: '订单数', type: 'line', data: data.map(d => d.orderCount), yAxisIndex: 1,
+                      smooth: true, lineStyle:{color:'#11998e'}, itemStyle:{color:'#11998e'}, symbol:'circle', symbolSize:7 }
+                ]
+            });
+        },
+        renderRadar() {
+            const c = this.getChart('radarChart'); if (!c) return;
+            const data = this.cc.radarData.slice(0, 8);
+            if (!data.length) return;
+            const maxPrice  = Math.max(...data.map(d => d.avgPrice),  1);
+            const maxSales  = Math.max(...data.map(d => d.avgSales),  1);
+            const maxRating = 5;
+            c.setOption({
+                tooltip: {},
+                legend: { data: data.map(d => d.category), top: 0, type: 'scroll' },
+                radar: { indicator: [
+                    { name: '均价', max: maxPrice },
+                    { name: '销量', max: maxSales },
+                    { name: '评分', max: maxRating }
+                ], radius: '62%', center: ['50%','55%'] },
+                series: [{ type: 'radar',
+                    data: data.map((d, i) => ({
+                        name: d.category,
+                        value: [d.avgPrice, d.avgSales, d.avgRating],
+                        itemStyle: { color: PALETTE[i % PALETTE.length] },
+                        areaStyle: { opacity: 0.18 }
+                    }))
+                }]
+            });
+        },
+
+        /* ---- 工具方法 ---- */
+        tagStyle(tag) {
+            const base = TAG_COLORS[tag.category] || '#909399';
+            const max = this.rs.topTags[0] ? this.rs.topTags[0].value : 1;
+            const ratio = tag.value / max;
+            const size = Math.round(12 + ratio * 10);
+            return { background: base + '22', color: base, fontSize: size + 'px',
+                     border: '1px solid ' + base + '55' };
+        },
+        compIndex(row) {
+            const maxRev = this.cc.competition[0] ? this.cc.competition[0].revenue : 1;
+            return Math.min(100, Math.round((row.revenue / (maxRev || 1)) * 70
+                + (row.supplierCount / 10) * 15
+                + (row.orderCount / (this.cc.competition[0] ? this.cc.competition[0].orderCount || 1 : 1)) * 15));
+        },
+        compColor(row) {
+            const idx = this.compIndex(row);
+            return idx >= 70 ? '#f56c6c' : idx >= 40 ? '#e6a23c' : '#67c23a';
+        },
+        syncToHdfs() {
+            this.$confirm('确定将运营报告数据同步到HDFS？', '同步确认', {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'info'
+            }).then(() => {
+                this.hdfsLoading = true;
+                axios.post('/api/hdfs/sync/operation-report')
+                    .then(response => {
+                        const res = response.data;
+                        if (res.code === 200) {
+                            const d = res.data || {};
+                            const storageLabel = d.storage_type === 'hdfs' ? 'HDFS' : '本地文件';
+                            const datasets = (d.datasets || []).filter(s => s.storage_type !== 'skip');
+                            const detail = datasets.map(s =>
+                                `${s.table}：${s.record_count} 条`
+                            ).join('<br>');
+                            const hdfsNote = d.storage_type === 'local'
+                                ? ``
+                                : '';
+                            this.$notify({
+                                title: d.storage_type === 'hdfs' ? '同步成功' : '同步成功',
+                                message: `共 ${d.total_records} 条 → ${storageLabel}<br>${detail}${hdfsNote}`,
+                                type: d.storage_type === 'hdfs' ? 'success' : 'warning',
+                                dangerouslyUseHTMLString: true,
+                                duration: 7000
+                            });
+                        } else {
+                            this.$message.error(res.message || '同步失败');
+                        }
+                    })
+                    .catch(err => {
+                        console.error('同步HDFS失败:', err);
+                        this.$message.error('同步请求失败，请检查服务状态');
+                    })
+                    .finally(() => {
+                        this.hdfsLoading = false;
+                    });
+            }).catch(() => {});
+        }
+    }
+});
+</script>
+</body>
+</html>
+

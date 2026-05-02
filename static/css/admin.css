@@ -1,0 +1,641 @@
+/* 后台管理系统样式 - 黄色主题 */
+
+/* CSS变量定义 */
+:root {
+    --admin-primary: #f59e0b;
+    --admin-primary-light: #fbbf24;
+    --admin-primary-deep: #d97706;
+    --admin-secondary: #f97316;
+    --admin-success: #10b981;
+    --admin-warning: #f59e0b;
+    --admin-danger: #ef4444;
+    --admin-info: #64748b;
+    --admin-text: #1f2937;
+    --admin-text-light: #6b7280;
+    --admin-text-lighter: #9ca3af;
+    --admin-bg: #f9fafb;
+    --admin-white: #ffffff;
+    --admin-sidebar-bg: #1e293b;
+    --admin-sidebar-hover: #334155;
+    --admin-sidebar-active: #0f172a;
+    
+    --admin-gradient-primary: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    --admin-gradient-sidebar: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    --admin-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --admin-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+    --admin-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* 全局样式 */
+body {
+    background: var(--admin-bg);
+    font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+}
+
+/* ==================== 后台现代化容器 ==================== */
+.modern-admin-container {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* ==================== 现代化侧边栏 ==================== */
+.modern-sidebar {
+    background: var(--admin-gradient-sidebar);
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 侧边栏头部 */
+.sidebar-header {
+    padding: 25px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.logo-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.logo-icon-admin {
+    width: 45px;
+    height: 45px;
+    background: var(--admin-gradient-primary);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+    transition: all 0.3s ease;
+}
+
+.logo-icon-admin:hover {
+    transform: rotate(10deg) scale(1.05);
+}
+
+.logo-icon-admin i {
+    font-size: 24px;
+    color: white;
+}
+
+.logo-text-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.logo-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    letter-spacing: 0.5px;
+}
+
+.logo-subtitle {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.logo-icon-collapsed {
+    display: flex;
+    justify-content: center;
+}
+
+.logo-icon-collapsed i {
+    font-size: 32px;
+    color: var(--admin-primary-light);
+}
+
+/* 菜单包装器 */
+.menu-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 15px 10px;
+}
+
+.menu-wrapper::-webkit-scrollbar {
+    width: 6px;
+}
+
+.menu-wrapper::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.menu-wrapper::-webkit-scrollbar-thumb {
+    background: rgba(245, 158, 11, 0.3);
+    border-radius: 3px;
+}
+
+.menu-wrapper::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 158, 11, 0.5);
+}
+
+/* 菜单项 */
+.menu-item-admin {
+    position: relative;
+    margin-bottom: 8px;
+    cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.menu-item-admin:hover {
+    background: var(--admin-sidebar-hover);
+    transform: translateX(5px);
+}
+
+.menu-item-admin.is-active {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2) 0%, rgba(251, 191, 36, 0.15) 100%);
+}
+
+.menu-item-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 14px 16px;
+    position: relative;
+}
+
+.menu-icon-box {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.menu-item-admin:hover .menu-icon-box {
+    background: rgba(245, 158, 11, 0.2);
+    transform: scale(1.1);
+}
+
+.menu-item-admin.is-active .menu-icon-box {
+    background: var(--admin-gradient-primary);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.menu-icon-box i {
+    font-size: 18px;
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 0.3s ease;
+}
+
+.menu-item-admin:hover .menu-icon-box i {
+    color: var(--admin-primary-light);
+}
+
+.menu-item-admin.is-active .menu-icon-box i {
+    color: white;
+}
+
+.menu-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.menu-item-admin:hover .menu-title {
+    color: white;
+}
+
+.menu-item-admin.is-active .menu-title {
+    color: white;
+    font-weight: 600;
+}
+
+.active-bar {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 4px;
+    height: 60%;
+    background: var(--admin-gradient-primary);
+    border-radius: 0 4px 4px 0;
+    transition: transform 0.3s ease;
+}
+
+.menu-item-admin.is-active .active-bar {
+    transform: translateY(-50%) scaleY(1);
+}
+
+/* 侧边栏底部 */
+.sidebar-footer {
+    padding: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.collapse-btn-modern {
+    width: 100%;
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    color: var(--admin-primary-light);
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.collapse-btn-modern:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: var(--admin-primary);
+    transform: translateY(-2px);
+}
+
+.collapse-btn-modern i {
+    font-size: 18px;
+}
+
+/* ==================== 主容器 ==================== */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    background: var(--admin-bg);
+}
+
+/* ==================== 现代化顶部导航 ==================== */
+.modern-admin-header {
+    background: white;
+    box-shadow: var(--admin-shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 30px;
+    height: 65px;
+    border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.breadcrumb-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    background: rgba(245, 158, 11, 0.05);
+    border-radius: 10px;
+}
+
+.breadcrumb-wrapper i {
+    font-size: 18px;
+    color: var(--admin-primary);
+}
+
+.breadcrumb-wrapper .el-breadcrumb {
+    font-size: 14px;
+}
+
+.breadcrumb-wrapper .el-breadcrumb__item {
+    font-weight: 500;
+}
+
+.breadcrumb-wrapper .el-breadcrumb__inner {
+    color: var(--admin-text-light);
+}
+
+.breadcrumb-wrapper .el-breadcrumb__item:last-child .el-breadcrumb__inner {
+    color: var(--admin-primary);
+    font-weight: 600;
+}
+
+/* 头部右侧 */
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.admin-user-dropdown {
+    cursor: pointer;
+}
+
+.admin-user-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.1);
+    transition: all 0.3s ease;
+}
+
+.admin-user-card:hover {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.15);
+}
+
+.admin-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.admin-username {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+.admin-role {
+    font-size: 12px;
+    color: var(--admin-text-light);
+}
+
+.admin-user-card i {
+    color: var(--admin-primary);
+    font-size: 12px;
+}
+
+/* 下拉菜单 */
+.admin-dropdown-menu {
+    border-radius: 12px;
+    border: 1px solid rgba(245, 158, 11, 0.1);
+    box-shadow: var(--admin-shadow-md);
+    padding: 8px;
+}
+
+.admin-dropdown-menu .el-dropdown-menu__item {
+    border-radius: 8px;
+    padding: 10px 16px;
+    margin: 2px 0;
+    transition: all 0.2s ease;
+}
+
+.admin-dropdown-menu .el-dropdown-menu__item:hover {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--admin-primary);
+}
+
+.admin-dropdown-menu .el-dropdown-menu__item i {
+    margin-right: 8px;
+    color: var(--admin-primary);
+}
+
+/* ==================== 主内容区域 ==================== */
+.modern-admin-main {
+    padding: 25px;
+    overflow-y: auto;
+    background: var(--admin-bg);
+    min-height: calc(100vh - 65px);
+}
+
+/* 卡片样式 */
+.el-card {
+    border-radius: 16px;
+    border: 1px solid rgba(245, 158, 11, 0.1);
+    box-shadow: var(--admin-shadow-sm);
+    transition: all 0.3s ease;
+}
+
+.el-card:hover {
+    box-shadow: var(--admin-shadow-md);
+    transform: translateY(-2px);
+}
+
+.el-card__header {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 191, 36, 0.03) 100%);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+    padding: 18px 20px;
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+/* 表格样式 */
+.el-table {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.el-table th {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(251, 191, 36, 0.05) 100%);
+    color: var(--admin-text);
+    font-weight: 600;
+}
+
+.el-table tr:hover {
+    background: rgba(245, 158, 11, 0.03);
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td {
+    background: rgba(245, 158, 11, 0.02);
+}
+
+/* 按钮样式 */
+.el-button--primary {
+    background: var(--admin-gradient-primary);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-weight: 600;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    transition: all 0.3s ease;
+}
+
+.el-button--primary:hover {
+    background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+}
+
+.el-button--success {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 8px;
+}
+
+.el-button--warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    border: none;
+    border-radius: 8px;
+}
+
+.el-button--danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 8px;
+}
+
+.el-button--info {
+    background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+    border: none;
+    border-radius: 8px;
+}
+
+/* 输入框样式 */
+.el-input__inner {
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+    transition: all 0.3s ease;
+}
+
+.el-input__inner:focus {
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+/* 选择器样式 */
+.el-select .el-input__inner {
+    border-radius: 8px;
+}
+
+/* 分页样式 */
+.el-pagination {
+    margin-top: 20px;
+}
+
+.el-pagination.is-background .el-pager li {
+    border-radius: 8px;
+    margin: 0 4px;
+}
+
+.el-pagination.is-background .el-pager li:not(.disabled).active {
+    background: var(--admin-gradient-primary);
+    color: white;
+}
+
+/* 标签样式 */
+.el-tag {
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-weight: 500;
+}
+
+.el-tag--primary {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--admin-primary);
+}
+
+.el-tag--success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.el-tag--warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.2);
+    color: var(--admin-warning);
+}
+
+.el-tag--danger {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* 对话框样式 */
+.el-dialog {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.el-dialog__header {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(251, 191, 36, 0.03) 100%);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.1);
+    padding: 20px;
+}
+
+.el-dialog__title {
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+/* 表单样式 */
+.el-form-item__label {
+    font-weight: 600;
+    color: var(--admin-text);
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 1200px) {
+    .modern-admin-main {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 768px) {
+    .modern-sidebar {
+        width: 80px !important;
+    }
+    
+    .modern-admin-header {
+        padding: 0 15px;
+    }
+    
+    .modern-admin-main {
+        padding: 15px;
+    }
+}
+
+/* ==================== 动画效果 ==================== */
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.menu-item-admin {
+    animation: slideInLeft 0.3s ease;
+}
+
+.el-card {
+    animation: fadeInUp 0.4s ease;
+}
+
+/* ==================== 滚动条美化 ==================== */
+.modern-admin-main::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modern-admin-main::-webkit-scrollbar-track {
+    background: rgba(245, 158, 11, 0.05);
+    border-radius: 4px;
+}
+
+.modern-admin-main::-webkit-scrollbar-thumb {
+    background: rgba(245, 158, 11, 0.3);
+    border-radius: 4px;
+}
+
+.modern-admin-main::-webkit-scrollbar-thumb:hover {
+    background: rgba(245, 158, 11, 0.5);
+}

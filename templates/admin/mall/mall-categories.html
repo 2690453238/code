@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>商品分类管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css"> 
+    <link rel="stylesheet" href="/static/css/admin.css"> 
+    <style>
+        .category-container {
+            padding: 20px;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        .category-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .category-header h2 {
+            margin: 0;
+            color: #303133;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .category-tree {
+            background: #fff;
+            border: 1px solid #e4e7ed;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .tree-actions {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        .tree-actions .el-button {
+            margin-right: 10px;
+        }
+        .custom-tree-node {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 14px;
+            padding-right: 8px;
+        }
+        .custom-tree-node span:first-child {
+            font-weight: 500;
+            color: #303133;
+        }
+        .custom-tree-node .el-button {
+            margin-left: 8px;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .category-form {
+            margin-top: 20px;
+        }
+        .el-tree {
+            background: transparent;
+        }
+        .el-tree-node__content {
+            height: 40px;
+            line-height: 40px;
+            border-radius: 4px;
+            margin: 2px 0;
+            transition: all 0.3s;
+        }
+        .el-tree-node__content:hover {
+            background-color: #f5f7fa;
+        }
+        .el-tree-node__expand-icon {
+            color: #909399;
+            font-size: 14px;
+        }
+        .el-tree-node__expand-icon.is-leaf {
+            color: transparent;
+        }
+        .el-card {
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .el-card__body {
+            padding: 20px;
+        }
+        .el-dialog {
+            border-radius: 8px;
+        }
+        .el-dialog__header {
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+            padding: 20px;
+        }
+        .el-dialog__title {
+            font-weight: 600;
+            color: #303133;
+        }
+        .el-dialog__body {
+            padding: 20px;
+        }
+        .el-dialog__footer {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+        .category-tree-component {
+            border: none;
+        }
+        .category-tree-component .el-tree-node__content {
+            border: 1px solid transparent;
+            border-radius: 6px;
+            margin: 1px 0;
+            transition: all 0.2s ease;
+        }
+        .category-tree-component .el-tree-node__content:hover {
+            background-color: #ecf5ff;
+            border-color: #b3d8ff;
+        }
+        .category-tree-component .el-tree-node.is-current > .el-tree-node__content {
+            background-color: #ecf5ff;
+            border-color: #409eff;
+        }
+        .category-tree-component .el-tree-node__expand-icon {
+            padding: 6px;
+            border-radius: 3px;
+            transition: all 0.2s ease;
+        }
+        .category-tree-component .el-tree-node__expand-icon:hover {
+            background-color: #e6f7ff;
+        }
+        .tree-actions .el-button {
+            border-radius: 6px;
+            font-weight: 500;
+        }
+        .tree-actions .el-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="category-container">
+                <div class="category-header">
+                    <h2>商品分类管理</h2>
+                    <el-button type="primary" @click="showAddDialog">
+                        <i class="el-icon-plus"></i>
+                        添加分类
+                    </el-button>
+                </div>
+
+                <!-- 分类树 -->
+                <el-card>
+                    <div class="tree-actions">
+                        <el-button type="primary" icon="el-icon-plus" @click="expandAll">展开全部</el-button>
+                        <el-button type="info" icon="el-icon-minus" @click="collapseAll">收起全部</el-button>
+                        <el-button type="success" icon="el-icon-refresh" @click="loadCategories">刷新</el-button>
+                    </div>
+                    
+                    <el-tree
+                        :data="categoryTree"
+                        :props="treeProps"
+                        node-key="id"
+                        :expand-on-click-node="false"
+                        :default-expand-all="false"
+                        :highlight-current="true"
+                        :check-strictly="true"
+                        :expanded-keys="expandedKeys"
+                        ref="categoryTree"
+                        class="category-tree-component">
+                        <span class="custom-tree-node" slot-scope="{ node, data }">
+                            <span>{{ node.label }}</span>
+                            <span style="float: right; margin-right: 20px;">
+                                <el-button
+                                    type="text"
+                                    size="mini"
+                                    @click="() => addChild(data)">
+                                    添加子分类
+                                </el-button>
+                                <el-button
+                                    type="text"
+                                    size="mini"
+                                    @click="() => editCategory(data)">
+                                    编辑
+                                </el-button>
+                                <el-button
+                                    type="text"
+                                    size="mini"
+                                    style="color: #f56c6c"
+                                    @click="() => deleteCategory(data)">
+                                    删除
+                                </el-button>
+                            </span>
+                        </span>
+                    </el-tree>
+                </el-card>
+
+                <!-- 添加/编辑分类对话框 -->
+                <el-dialog
+                    :title="dialogTitle"
+                    :visible.sync="dialogVisible"
+                    width="500px">
+                    <el-form :model="categoryForm" :rules="categoryRules" ref="categoryForm" label-width="100px">
+                        <el-form-item label="分类名称" prop="name">
+                            <el-input v-model="categoryForm.name" placeholder="请输入分类名称"></el-input>
+                        </el-form-item>
+                        <el-form-item label="父分类" prop="parentId">
+                            <el-select v-model="categoryForm.parentId" placeholder="请选择父分类" style="width: 100%">
+                                <el-option label="顶级分类" :value="0"></el-option>
+                                <el-option 
+                                    v-for="category in flatCategories" 
+                                    :key="category.id" 
+                                    :label="category.name" 
+                                    :value="category.id">
+                                </el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="排序" prop="sort">
+                            <el-input-number v-model="categoryForm.sort" :min="0" :max="999"></el-input-number>
+                        </el-form-item>
+                    </el-form>
+                    <div slot="footer" class="dialog-footer">
+                        <el-button @click="dialogVisible = false">取消</el-button>
+                        <el-button type="primary" @click="saveCategory">确定</el-button>
+                    </div>
+                </el-dialog>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app', 
+            data() {
+                return {
+                    activeMenu: 'mall-categories',
+                    categoryTree: [],
+                    flatCategories: [],
+                    expandedKeys: [],
+                    treeProps: {
+                        children: 'children',
+                        label: 'name'
+                    },
+                    dialogVisible: false,
+                    dialogTitle: '添加分类',
+                    categoryForm: {
+                        id: null,
+                        name: '',
+                        parentId: 0,
+                        sort: 0
+                    },
+                    categoryRules: {
+                        name: [
+                            { required: true, message: '请输入分类名称', trigger: 'blur' }
+                        ]
+                    }
+                }
+            },
+            mounted() {
+                this.loadCategories();
+            },
+            methods: {
+
+                // 加载分类列表
+                loadCategories() {
+                    axios.get('/api/mall/category/tree')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.categoryTree = response.data.data;
+                                this.flatCategories = this.flattenTree(response.data.data);
+                                console.log('加载的分类树数据:', this.categoryTree);
+                                console.log('分类树数据类型:', typeof this.categoryTree, '是否为数组:', Array.isArray(this.categoryTree));
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载分类失败:', error);
+                            this.$message.error('加载分类失败');
+                        });
+                },
+
+                // 扁平化树结构
+                flattenTree(tree, result = []) {
+                    tree.forEach(item => {
+                        result.push({
+                            id: item.id,
+                            name: item.name,
+                            level: item.level
+                        });
+                        if (item.children && item.children.length > 0) {
+                            this.flattenTree(item.children, result);
+                        }
+                    });
+                    return result;
+                },
+
+                // 展开全部
+                expandAll() {
+                    const allKeys = this.getAllKeys(this.categoryTree);
+                    console.log('展开的节点keys:', allKeys);
+                    console.log('当前分类树:', this.categoryTree);
+                    
+                    // 方法1：直接设置expandedKeys
+                    this.expandedKeys = [...allKeys];
+                    
+                    // 方法2：使用树组件的API强制展开
+                    this.$nextTick(() => {
+                        if (this.$refs.categoryTree) {
+                            // 遍历所有节点并展开
+                            allKeys.forEach(key => {
+                                const node = this.$refs.categoryTree.getNode(key);
+                                if (node) {
+                                    node.expanded = true;
+                                }
+                            });
+                        }
+                        console.log('设置后的expandedKeys:', this.expandedKeys);
+                        this.$message.success(`已展开 ${allKeys.length} 个分类节点`);
+                    });
+                },
+
+                // 收起全部
+                collapseAll() {
+                    // 方法1：清空expandedKeys
+                    this.expandedKeys = [];
+                    
+                    // 方法2：使用树组件的API强制收起
+                    this.$nextTick(() => {
+                        if (this.$refs.categoryTree) {
+                            // 获取所有节点并收起
+                            const allNodes = this.$refs.categoryTree.store.nodesMap;
+                            Object.values(allNodes).forEach(node => {
+                                if (node.expanded) {
+                                    node.expanded = false;
+                                }
+                            });
+                        }
+                        this.$message.success('已收起所有分类节点');
+                    });
+                },
+
+                // 获取所有节点key
+                getAllKeys(tree, keys = []) {
+                    if (!tree || !Array.isArray(tree)) {
+                        console.log('树数据为空或不是数组:', tree);
+                        return keys;
+                    }
+                    
+                    tree.forEach(item => {
+                        if (item && item.id) {
+                            keys.push(item.id);
+                            console.log('添加节点ID:', item.id, '节点名称:', item.name);
+                        }
+                        if (item.children && item.children.length > 0) {
+                            this.getAllKeys(item.children, keys);
+                        }
+                    });
+                    console.log('最终获取的keys:', keys);
+                    return keys;
+                },
+
+                // 显示添加对话框
+                showAddDialog() {
+                    this.dialogTitle = '添加分类';
+                    this.categoryForm = {
+                        id: null,
+                        name: '',
+                        parentId: 0,
+                        sort: 0
+                    };
+                    this.dialogVisible = true;
+                },
+
+                // 添加子分类
+                addChild(parent) {
+                    this.dialogTitle = '添加子分类';
+                    this.categoryForm = {
+                        id: null,
+                        name: '',
+                        parentId: parent.id,
+                        sort: 0
+                    };
+                    this.dialogVisible = true;
+                },
+
+                // 编辑分类
+                editCategory(category) {
+                    this.dialogTitle = '编辑分类';
+                    this.categoryForm = {
+                        id: category.id,
+                        name: category.name,
+                        parentId: category.parentId,
+                        sort: category.sort
+                    };
+                    this.dialogVisible = true;
+                },
+
+                // 保存分类
+                saveCategory() {
+                    this.$refs.categoryForm.validate((valid) => {
+                        if (valid) {
+                            const url = this.categoryForm.id ? 
+                                `/api/mall/category/${this.categoryForm.id}` : 
+                                '/api/mall/category/';
+                            const method = this.categoryForm.id ? 'put' : 'post';
+                            
+                            axios[method](url, this.categoryForm)
+                                .then(response => {
+                                    if (response.data.code === 200) {
+                                        this.$message.success(response.data.message);
+                                        this.dialogVisible = false;
+                                        this.loadCategories();
+                                    } else {
+                                        this.$message.error(response.data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('保存分类失败:', error);
+                                    this.$message.error('保存分类失败');
+                                });
+                        }
+                    });
+                },
+
+                // 删除分类
+                deleteCategory(category) {
+                    this.$confirm('确定要删除这个分类吗？', '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        axios.delete(`/api/mall/category/${category.id}`)
+                            .then(response => {
+                                if (response.data.code === 200) {
+                                    this.$message.success(response.data.message);
+                                    this.loadCategories();
+                                } else {
+                                    this.$message.error(response.data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('删除分类失败:', error);
+                                this.$message.error('删除分类失败');
+                            });
+                    }).catch(() => {
+                        // 用户取消删除
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,289 @@
+/**
+ * 富文本编辑器样式
+ * 可复用的富文本编辑器组件样式
+ */
+
+.rich-editor-container {
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    background: #fff;
+    transition: border-color 0.2s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.rich-editor-container:hover {
+    border-color: #c0c4cc;
+}
+
+.rich-editor-container:focus-within {
+    border-color: #409eff;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.rich-editor-wrapper {
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.rich-editor-toolbar {
+    border-bottom: 1px solid #e4e7ed;
+    background: #fafafa;
+    border-radius: 4px 4px 0 0;
+}
+
+.rich-editor-content {
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Quill编辑器样式覆盖 */
+.rich-editor-container .ql-toolbar {
+    border: none;
+    border-bottom: 1px solid #e4e7ed;
+    background: #fafafa;
+    border-radius: 4px 4px 0 0;
+    padding: 8px 12px;
+}
+
+.rich-editor-container .ql-container {
+    border: none;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.rich-editor-container .ql-editor {
+    padding: 12px;
+    min-height: 200px;
+    max-height: 100%;
+    overflow-y: auto;
+}
+
+.rich-editor-container .ql-editor.ql-blank::before {
+    color: #c0c4cc;
+    font-style: normal;
+    left: 12px;
+    right: 12px;
+}
+
+/* 工具栏按钮样式 */
+.rich-editor-container .ql-toolbar .ql-formats {
+    margin-right: 15px;
+}
+
+.rich-editor-container .ql-toolbar button {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    margin: 0 2px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-toolbar button:hover {
+    background: #e6f7ff;
+    color: #409eff;
+}
+
+.rich-editor-container .ql-toolbar button.ql-active {
+    background: #409eff;
+    color: #fff;
+}
+
+.rich-editor-container .ql-toolbar button.ql-active:hover {
+    background: #337ecc;
+}
+
+/* 下拉菜单样式 */
+.rich-editor-container .ql-toolbar .ql-picker {
+    color: #606266;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker:hover {
+    background: #e6f7ff;
+    color: #409eff;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker.ql-expanded {
+    background: #e6f7ff;
+    color: #409eff;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker-options {
+    border: 1px solid #e4e7ed;
+    border-radius: 4px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    background: #fff;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker-item {
+    padding: 8px 12px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker-item:hover {
+    background: #f5f7fa;
+    color: #409eff;
+}
+
+.rich-editor-container .ql-toolbar .ql-picker-item.ql-selected {
+    background: #409eff;
+    color: #fff;
+}
+
+/* 颜色选择器样式 */
+.rich-editor-container .ql-color-picker,
+.rich-editor-container .ql-background {
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    margin: 0 2px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-color-picker:hover,
+.rich-editor-container .ql-background:hover {
+    background: #e6f7ff;
+}
+
+/* 链接输入框样式 */
+.rich-editor-container .ql-tooltip {
+    border: 1px solid #e4e7ed;
+    border-radius: 4px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    background: #fff;
+    z-index: 1000;
+}
+
+.rich-editor-container .ql-tooltip input {
+    border: 1px solid #dcdfe6;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.rich-editor-container .ql-tooltip input:focus {
+    border-color: #409eff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.2);
+}
+
+.rich-editor-container .ql-tooltip a.ql-preview {
+    color: #409eff;
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-tooltip a.ql-preview:hover {
+    background: #e6f7ff;
+}
+
+.rich-editor-container .ql-tooltip a.ql-action {
+    color: #409eff;
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-tooltip a.ql-action:hover {
+    background: #e6f7ff;
+}
+
+.rich-editor-container .ql-tooltip a.ql-remove {
+    color: #f56c6c;
+    text-decoration: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.rich-editor-container .ql-tooltip a.ql-remove:hover {
+    background: #fef0f0;
+}
+
+/* 只读模式样式 */
+.rich-editor-container.readonly {
+    background: #f5f7fa;
+    border-color: #e4e7ed;
+}
+
+.rich-editor-container.readonly .ql-toolbar {
+    display: none;
+}
+
+.rich-editor-container.readonly .ql-editor {
+    background: transparent;
+    cursor: default;
+}
+
+/* 错误状态样式 */
+.rich-editor-container.error {
+    border-color: #f56c6c;
+}
+
+.rich-editor-container.error:focus-within {
+    border-color: #f56c6c;
+    box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.2);
+}
+
+/* 禁用状态样式 */
+.rich-editor-container.disabled {
+    background: #f5f7fa;
+    border-color: #e4e7ed;
+    cursor: not-allowed;
+}
+
+.rich-editor-container.disabled .ql-toolbar {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.rich-editor-container.disabled .ql-editor {
+    background: transparent;
+    cursor: not-allowed;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .rich-editor-container .ql-toolbar {
+        padding: 6px 8px;
+    }
+    
+    .rich-editor-container .ql-toolbar button {
+        width: 24px;
+        height: 24px;
+        margin: 0 1px;
+    }
+    
+    .rich-editor-container .ql-editor {
+        padding: 8px;
+        min-height: 150px;
+    }
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+    .rich-editor-container {
+        background: #2d2d2d;
+        border-color: #4c4d4f;
+        color: #e6e6e6;
+    }
+    
+    .rich-editor-container .ql-toolbar {
+        background: #3a3a3a;
+        border-bottom-color: #4c4d4f;
+    }
+    
+    .rich-editor-container .ql-editor {
+        color: #e6e6e6;
+    }
+    
+    .rich-editor-container .ql-editor.ql-blank::before {
+        color: #8c8c8c;
+    }
+}

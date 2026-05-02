@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template slot="content">
+                <div class="dashboard-container">
+                    <!-- 页面标题 -->
+                    <div class="page-header">
+                        <h2>仪表盘</h2>
+                        <p>系统概览和数据分析</p>
+                    </div>
+
+                    <!-- 统计卡片 -->
+                    <el-row :gutter="20" class="stats-row">
+                        <el-col :xs="24" :sm="12" :md="6" v-for="stat in stats" :key="stat.key">
+                            <el-card class="stat-card" :class="stat.key">
+                                <div class="stat-content">
+                                    <div class="stat-icon">
+                                        <i :class="stat.icon"></i>
+                                    </div>
+                                    <div class="stat-info">
+                                        <h3>{{ stat.value }}</h3>
+                                        <p>{{ stat.label }}</p>
+                                        <div class="stat-trend" v-if="stat.trend">
+                                            <span :class="stat.trend > 0 ? 'trend-up' : 'trend-down'">
+                                                <i :class="stat.trend > 0 ? 'el-icon-arrow-up' : 'el-icon-arrow-down'"></i>
+                                                {{ Math.abs(stat.trend) }}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                    
+                    <!-- 图表区域 -->
+                    <el-row :gutter="20" class="charts-row">
+                        <el-col :xs="24" :lg="12">
+                            <el-card class="chart-card">
+                                <div slot="header" class="card-header">
+                                    <span>用户注册趋势</span>
+                                    <el-button type="text" @click="refreshUserTrend">
+                                        <i class="el-icon-refresh"></i> 刷新
+                                    </el-button>
+                                </div>
+                                <div id="userTrendChart" style="height: 300px;" v-loading="trendLoading"></div>
+                            </el-card>
+                        </el-col>
+                        
+                        <el-col :xs="24" :lg="12">
+                            <el-card class="chart-card">
+                                <div slot="header" class="card-header">
+                                    <span>用户角色分布</span>
+                                    <el-button type="text" @click="refreshRoleDistribution">
+                                        <i class="el-icon-refresh"></i> 刷新
+                                    </el-button>
+                                </div>
+                                <div id="roleDistributionChart" style="height: 300px;" v-loading="roleLoading"></div>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+ 
+
+                        <el-col :xs="24" :lg="12" v-if="false">
+                            <el-card class="quick-actions-card">
+                                <div slot="header" class="card-header">
+                                    <span>快速操作</span>
+                                </div>
+                                <div class="quick-actions">
+                                    <el-button type="primary" icon="el-icon-user" @click="goToUsers">
+                                        用户管理
+                                    </el-button>
+                                    <el-button type="success" icon="el-icon-bell" @click="goToAnnouncements">
+                                        公告管理
+                                    </el-button>
+                                    <el-button type="warning" icon="el-icon-setting" @click="goToSettings">
+                                        系统设置
+                                    </el-button>
+                                    <el-button type="info" icon="el-icon-view" @click="goToFront">
+                                        前台预览
+                                    </el-button>
+                                </div>
+                            </el-card>
+                        </el-col>
+                    </el-row>
+                     
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/echarts.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'dashboard',
+                    stats: [
+                        { key: 'total_users', label: '总用户数', value: 0, icon: 'el-icon-user', trend: 0 }, 
+                        { key: 'admin_users', label: '管理员', value: 0, icon: 'el-icon-s-custom', trend: 0 },
+                        { key: 'normal_users', label: '普通用户', value: 0, icon: 'el-icon-s-platform', trend: 0 },
+                        { key: 'today_users', label: '今日新增', value: 0, icon: 'el-icon-plus', trend: 0 }
+                    ], 
+                    activityLoading: false,
+                    trendLoading: false,
+                    roleLoading: false,
+                    trendChart: null,
+                    roleChart: null
+                }
+            },
+            mounted() {
+                this.loadDashboardData();
+                this.$nextTick(() => {
+                    this.initCharts();
+                });
+            },
+            methods: {
+                async loadDashboardData() {
+                    try {
+                        // 加载统计数据
+                        const statsResponse = await axios.get('/api/dashboard/overview');
+                        if (statsResponse.data.code === 200) {
+                            const data = statsResponse.data.data;
+                            
+                            // 更新用户统计
+                            this.stats = [
+                                { 
+                                    key: 'total_users', 
+                                    label: '总用户数', 
+                                    value: data.user_stats.total_users, 
+                                    icon: 'el-icon-user',
+                                    trend: this.calculateTrend(data.user_stats.total_users, data.user_stats.today_users)
+                                },
+                                { 
+                                    key: 'admin_users', 
+                                    label: '管理员', 
+                                    value: data.user_stats.admin_users, 
+                                    icon: 'el-icon-s-custom',
+                                    trend: 0
+                                },
+                                { 
+                                    key: 'normal_users', 
+                                    label: '普通用户', 
+                                    value: data.user_stats.normal_users, 
+                                    icon: 'el-icon-s-platform',
+                                    trend: 0
+                                },
+                                { 
+                                    key: 'today_users', 
+                                    label: '今日新增', 
+                                    value: data.user_stats.today_users, 
+                                    icon: 'el-icon-plus',
+                                    trend: 0
+                                }
+                            ];
+ 
+                        }
+                    } catch (error) {
+                        console.error('加载仪表盘数据失败:', error);
+                        this.$message.error('加载数据失败，请稍后重试');
+                    }
+                },
+                calculateTrend(total, today) {
+                    if (total === 0) return 0;
+                    return Math.round((today / total) * 100);
+                }, 
+                async refreshUserTrend() {
+                    this.trendLoading = true;
+                    try {
+                        const response = await axios.get('/api/dashboard/user-trend?days=7');
+                        if (response.data.code === 200) {
+                            this.updateTrendChart(response.data.data);
+                        }
+                    } catch (error) {
+                        console.error('刷新用户趋势失败:', error);
+                        this.$message.error('刷新数据失败');
+                    } finally {
+                        this.trendLoading = false;
+                    }
+                },
+                async refreshRoleDistribution() {
+                    this.roleLoading = true;
+                    try {
+                        const response = await axios.get('/api/dashboard/role-distribution');
+                        if (response.data.code === 200) {
+                            this.updateRoleChart(response.data.data);
+                        }
+                    } catch (error) {
+                        console.error('刷新角色分布失败:', error);
+                        this.$message.error('刷新数据失败');
+                    } finally {
+                        this.roleLoading = false;
+                    }
+                }, 
+                initCharts() {
+                    // 初始化用户趋势图
+                    this.trendChart = echarts.init(document.getElementById('userTrendChart'));
+                    
+                    // 初始化角色分布图
+                    this.roleChart = echarts.init(document.getElementById('roleDistributionChart'));
+                    
+                    // 加载图表数据
+                    this.loadChartData();
+                },
+                async loadChartData() {
+                    try {
+                        // 加载趋势数据
+                        const trendResponse = await axios.get('/api/dashboard/user-trend?days=7');
+                        if (trendResponse.data.code === 200) {
+                            this.updateTrendChart(trendResponse.data.data);
+                        }
+
+                        // 加载角色分布数据
+                        const roleResponse = await axios.get('/api/dashboard/role-distribution');
+                        if (roleResponse.data.code === 200) {
+                            this.updateRoleChart(roleResponse.data.data);
+                        }
+                    } catch (error) {
+                        console.error('加载图表数据失败:', error);
+                    }
+                },
+                updateTrendChart(data) {
+                    if (!this.trendChart) return;
+                    
+                    const option = {
+                        tooltip: {
+                            trigger: 'axis',
+                            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                            borderColor: '#e4e7ed',
+                            textStyle: { color: '#333' }
+                        },
+                        grid: {
+                            left: '3%',
+                            right: '4%',
+                            bottom: '3%',
+                            containLabel: true
+                        },
+                        xAxis: {
+                            type: 'category',
+                            data: data.dates || [],
+                            axisLine: { lineStyle: { color: '#e4e7ed' } },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#666' }
+                        },
+                        yAxis: {
+                            type: 'value',
+                            axisLine: { show: false },
+                            axisTick: { show: false },
+                            axisLabel: { color: '#666' },
+                            splitLine: { lineStyle: { color: '#f0f0f0' } }
+                        },
+                        series: [{
+                            data: data.data || [],
+                            type: 'line',
+                            smooth: true,
+                            symbol: 'circle',
+                            symbolSize: 6,
+                            lineStyle: { width: 3 },
+                            itemStyle: { color: '#409eff' },
+                            areaStyle: {
+                                color: {
+                                    type: 'linear',
+                                    x: 0, y: 0, x2: 0, y2: 1,
+                                    colorStops: [
+                                        { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+                                        { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
+                                    ]
+                                }
+                            }
+                        }]
+                    };
+                    this.trendChart.setOption(option);
+                },
+                updateRoleChart(data) {
+                    if (!this.roleChart) return;
+                    
+                    const option = {
+                        tooltip: {
+                            trigger: 'item',
+                            formatter: '{a} <br/>{b}: {c} ({d}%)'
+                        },
+                        legend: {
+                            orient: 'vertical',
+                            left: 'left',
+                            textStyle: { color: '#666' }
+                        },
+                        series: [{
+                            name: '用户角色',
+                            type: 'pie',
+                            radius: ['40%', '70%'],
+                            center: ['60%', '50%'],
+                            data: data || [],
+                            emphasis: {
+                                itemStyle: {
+                                    shadowBlur: 10,
+                                    shadowOffsetX: 0,
+                                    shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                }
+                            },
+                            label: {
+                                show: true,
+                                formatter: '{b}: {c}'
+                            },
+                            labelLine: {
+                                show: true
+                            }
+                        }]
+                    };
+                    this.roleChart.setOption(option);
+                },
+                getActivityIcon(type) {
+                    const iconMap = {
+                        'user_register': 'el-icon-user',
+                        'announcement_publish': 'el-icon-bell'
+                    };
+                    return iconMap[type] || 'el-icon-info';
+                },
+                formatTime(timeStr) {
+                    const time = new Date(timeStr);
+                    const now = new Date();
+                    const diff = now - time;
+                    const minutes = Math.floor(diff / 60000);
+                    const hours = Math.floor(diff / 3600000);
+                    const days = Math.floor(diff / 86400000);
+                    
+                    if (minutes < 60) {
+                        return `${minutes}分钟前`;
+                    } else if (hours < 24) {
+                        return `${hours}小时前`;
+                    } else if (days < 7) {
+                        return `${days}天前`;
+                    } else {
+                        return time.toLocaleDateString();
+                    }
+                },
+                goToUsers() {
+                    window.location.href = '/admin/users.html';
+                },
+                goToAnnouncements() {
+                    window.location.href = '/admin/announcements.html';
+                },
+                goToSettings() {
+                    this.$message.info('系统设置功能开发中...');
+                },
+                goToFront() {
+                    window.location.href = '/front/index.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

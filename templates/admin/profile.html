@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .profile-row {
+            margin-bottom: 20px;
+        }
+
+        .avatar-card,
+        .edit-card,
+        .password-card {
+            margin-bottom: 20px;
+        }
+
+        .avatar-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 20px 0;
+        }
+
+        .avatar-upload-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #409eff;
+        }
+
+        .user-basic-info {
+            text-align: center;
+        }
+
+        .user-basic-info h3 {
+            margin: 0 0 10px;
+        }
+
+        .join-time {
+            color: #909399;
+            font-size: 13px;
+        }
+
+        .right-content {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="profile-container">
+                    <el-row :gutter="20" class="profile-row">
+                        <el-col :xs="24" :md="8">
+                            <el-card class="avatar-card">
+                                <div class="avatar-container">
+                                    <el-avatar :size="120" :src="userInfo.avatar || '/static/image/profile.png'"></el-avatar>
+                                    <el-upload
+                                        class="avatar-uploader"
+                                        :action="uploadUrl"
+                                        :show-file-list="false"
+                                        :on-success="handleAvatarSuccess"
+                                        :before-upload="beforeAvatarUpload">
+                                        <div class="avatar-upload-trigger">
+                                            <i class="el-icon-camera"></i>
+                                            <span>更换头像</span>
+                                        </div>
+                                    </el-upload>
+                                </div>
+                                <div class="user-basic-info">
+                                    <h3>{{ userInfo.nickname || userInfo.username }}</h3>
+                                    <p class="role-tag">
+                                        <el-tag :type="getRoleTagType(userInfo.role)" size="small">
+                                            {{ getRoleText(userInfo.role) }}
+                                        </el-tag>
+                                    </p>
+                                    <p class="join-time">加入时间：{{ userInfo.createtime || '-' }}</p>
+                                </div>
+                            </el-card>
+                        </el-col>
+
+                        <el-col :xs="24" :md="16">
+                            <div class="right-content">
+                                <el-card class="edit-card">
+                                    <div slot="header" class="card-header">
+                                        <span>个人信息</span>
+                                        <el-button type="primary" @click="saveProfile" :loading="saveLoading">保存</el-button>
+                                    </div>
+
+                                    <el-form
+                                        :model="profileForm"
+                                        :rules="profileRules"
+                                        ref="profileForm"
+                                        label-width="100px">
+                                        <el-row :gutter="20">
+                                            <el-col :span="12">
+                                                <el-form-item label="用户名">
+                                                    <el-input v-model="profileForm.username" disabled></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                            <el-col :span="12">
+                                                <el-form-item label="真实姓名" prop="nickname">
+                                                    <el-input v-model="profileForm.nickname"></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                        </el-row>
+
+                                        <el-row :gutter="20">
+                                            <el-col :span="12">
+                                                <el-form-item label="邮箱" prop="email">
+                                                    <el-input v-model="profileForm.email"></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                            <el-col :span="12">
+                                                <el-form-item label="手机号" prop="phone">
+                                                    <el-input v-model="profileForm.phone"></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                        </el-row>
+
+                                        <el-row :gutter="20">
+                                            <el-col :span="12">
+                                                <el-form-item label="性别">
+                                                    <el-select v-model="profileForm.sex" placeholder="选择性别">
+                                                        <el-option label="男" value="男"></el-option>
+                                                        <el-option label="女" value="女"></el-option>
+                                                    </el-select>
+                                                </el-form-item>
+                                            </el-col>
+                                            <el-col :span="12">
+                                                <el-form-item label="年龄">
+                                                    <el-input-number v-model="profileForm.age" :min="1" :max="120"></el-input-number>
+                                                </el-form-item>
+                                            </el-col>
+                                        </el-row>
+
+                                        <el-row :gutter="20">
+                                            <el-col :span="12">
+                                                <el-form-item label="生日">
+                                                    <el-date-picker
+                                                        v-model="profileForm.birthday"
+                                                        type="date"
+                                                        placeholder="选择生日"
+                                                        format="yyyy-MM-dd"
+                                                        value-format="yyyy-MM-dd">
+                                                    </el-date-picker>
+                                                </el-form-item>
+                                            </el-col>
+                                            <el-col :span="12">
+                                                <el-form-item label="学历">
+                                                    <el-select v-model="profileForm.education" placeholder="选择学历">
+                                                        <el-option label="小学" value="小学"></el-option>
+                                                        <el-option label="初中" value="初中"></el-option>
+                                                        <el-option label="高中" value="高中"></el-option>
+                                                        <el-option label="大专" value="大专"></el-option>
+                                                        <el-option label="本科" value="本科"></el-option>
+                                                        <el-option label="硕士" value="硕士"></el-option>
+                                                        <el-option label="博士" value="博士"></el-option>
+                                                    </el-select>
+                                                </el-form-item>
+                                            </el-col>
+                                        </el-row>
+
+                                        <el-row :gutter="20">
+                                            <el-col :span="12">
+                                                <el-form-item label="职业">
+                                                    <el-input v-model="profileForm.profession"></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                            <el-col :span="12">
+                                                <el-form-item label="公司">
+                                                    <el-input v-model="profileForm.company"></el-input>
+                                                </el-form-item>
+                                            </el-col>
+                                        </el-row>
+
+                                        <el-form-item label="地址">
+                                            <el-input v-model="profileForm.address"></el-input>
+                                        </el-form-item>
+
+                                        <el-form-item label="个人简介">
+                                            <el-input
+                                                v-model="profileForm.content"
+                                                type="textarea"
+                                                :rows="4"
+                                                placeholder="请输入个人简介">
+                                            </el-input>
+                                        </el-form-item>
+                                    </el-form>
+                                </el-card>
+
+                                <el-card class="password-card">
+                                    <div slot="header" class="card-header">
+                                        <span>修改密码</span>
+                                    </div>
+
+                                    <el-form
+                                        :model="passwordForm"
+                                        :rules="passwordRules"
+                                        ref="passwordForm"
+                                        label-width="100px"
+                                        style="max-width: 500px;">
+                                        <el-form-item label="原密码" prop="oldPassword">
+                                            <el-input v-model="passwordForm.oldPassword" type="password"></el-input>
+                                        </el-form-item>
+                                        <el-form-item label="新密码" prop="newPassword">
+                                            <el-input v-model="passwordForm.newPassword" type="password"></el-input>
+                                        </el-form-item>
+                                        <el-form-item label="确认密码" prop="confirmPassword">
+                                            <el-input v-model="passwordForm.confirmPassword" type="password"></el-input>
+                                        </el-form-item>
+                                        <el-form-item>
+                                            <el-button type="primary" @click="changePassword" :loading="passwordLoading">修改密码</el-button>
+                                            <el-button @click="resetPasswordForm">重置</el-button>
+                                        </el-form-item>
+                                    </el-form>
+                                </el-card>
+                            </div>
+                        </el-col>
+                    </el-row>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'profile',
+                    userInfo: {},
+                    saveLoading: false,
+                    passwordLoading: false,
+                    uploadUrl: '/open/upload',
+                    profileForm: {
+                        username: '',
+                        nickname: '',
+                        email: '',
+                        phone: '',
+                        sex: '',
+                        age: null,
+                        birthday: '',
+                        education: '',
+                        profession: '',
+                        company: '',
+                        address: '',
+                        content: ''
+                    },
+                    profileRules: {
+                        nickname: [
+                            { required: true, message: '请输入真实姓名', trigger: 'blur' }
+                        ],
+                        email: [
+                            { type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }
+                        ],
+                        phone: [
+                            { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }
+                        ]
+                    },
+                    passwordForm: {
+                        oldPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                    },
+                    passwordRules: {
+                        oldPassword: [
+                            { required: true, message: '请输入原密码', trigger: 'blur' }
+                        ],
+                        newPassword: [
+                            { required: true, message: '请输入新密码', trigger: 'blur' },
+                            { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+                        ],
+                        confirmPassword: [
+                            { required: true, message: '请确认密码', trigger: 'blur' }
+                        ]
+                    }
+                };
+            },
+            mounted() {
+                this.loadUserInfo();
+                this.passwordRules.confirmPassword.push({
+                    validator: this.validateConfirmPassword,
+                    trigger: 'blur'
+                });
+            },
+            methods: {
+                loadUserInfo() {
+                    axios.get('/api/user/profile')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.userInfo = response.data.data || {};
+                                this.profileForm = Object.assign({}, this.profileForm, this.userInfo);
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('获取用户信息失败:', error);
+                            this.$message.error('获取用户信息失败');
+                        });
+                },
+                saveProfile() {
+                    this.$refs.profileForm.validate((valid) => {
+                        if (!valid) {
+                            return;
+                        }
+                        this.saveLoading = true;
+                        axios.put(`/api/user/${this.userInfo.id}`, this.profileForm)
+                            .then(response => {
+                                if (response.data.code === 200) {
+                                    this.$message.success(response.data.message);
+                                    this.loadUserInfo();
+                                } else {
+                                    this.$message.error(response.data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('保存个人信息失败:', error);
+                                this.$message.error('保存个人信息失败');
+                            })
+                            .finally(() => {
+                                this.saveLoading = false;
+                            });
+                    });
+                },
+                changePassword() {
+                    this.$refs.passwordForm.validate((valid) => {
+                        if (!valid) {
+                            return;
+                        }
+                        this.passwordLoading = true;
+                        axios.post('/api/user/change-password', this.passwordForm)
+                            .then(response => {
+                                if (response.data.code === 200) {
+                                    this.$message.success(response.data.message);
+                                    this.resetPasswordForm();
+                                } else {
+                                    this.$message.error(response.data.message);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('修改密码失败:', error);
+                                this.$message.error('修改密码失败');
+                            })
+                            .finally(() => {
+                                this.passwordLoading = false;
+                            });
+                    });
+                },
+                resetPasswordForm() {
+                    this.passwordForm = {
+                        oldPassword: '',
+                        newPassword: '',
+                        confirmPassword: ''
+                    };
+                    if (this.$refs.passwordForm) {
+                        this.$refs.passwordForm.resetFields();
+                    }
+                },
+                validateConfirmPassword(rule, value, callback) {
+                    if (value !== this.passwordForm.newPassword) {
+                        callback(new Error('两次输入密码不一致'));
+                    } else {
+                        callback();
+                    }
+                },
+                handleAvatarSuccess(response) {
+                    if (response.code === 200) {
+                        this.userInfo.avatar = response.data.url;
+                        this.$message.success('头像上传成功');
+                        axios.put(`/api/user/${this.userInfo.id}`, {
+                            avatar: response.data.url
+                        }).then(() => {
+                            this.$message.success('头像保存成功');
+                            this.updateLocalUserInfo();
+                            this.$emit('avatar-updated', response.data.url);
+                        }).catch(error => {
+                            console.error('保存头像失败:', error);
+                            this.$message.error('头像保存失败');
+                        });
+                    } else {
+                        this.$message.error(response.message);
+                    }
+                },
+                beforeAvatarUpload(file) {
+                    const isImage = file.type === 'image/jpeg' || file.type === 'image/png';
+                    const isLt2M = file.size / 1024 / 1024 < 2;
+                    if (!isImage) {
+                        this.$message.error('上传头像图片只能是 JPG/PNG 格式');
+                    }
+                    if (!isLt2M) {
+                        this.$message.error('上传头像图片大小不能超过 2MB');
+                    }
+                    return isImage && isLt2M;
+                },
+                getRoleText(role) {
+                    const roleMap = {
+                        system_admin: '系统管理员',
+                        platform_operator: '平台运营',
+                        community_leader: '社区团长',
+                        user: '普通用户'
+                    };
+                    return roleMap[role] || role;
+                },
+                getRoleTagType(role) {
+                    const typeMap = {
+                        system_admin: 'danger',
+                        platform_operator: 'warning',
+                        community_leader: 'success',
+                        user: 'info'
+                    };
+                    return typeMap[role] || 'info';
+                },
+                updateLocalUserInfo() {
+                    const userInfoStr = JSON.stringify(this.userInfo);
+                    localStorage.setItem('userInfo', userInfoStr);
+                    sessionStorage.setItem('userInfo', userInfoStr);
+                    window.dispatchEvent(new CustomEvent('userInfoUpdated', {
+                        detail: { userInfo: this.userInfo }
+                    }));
+                }
+            }
+        });
+    </script>
+</body>
+</html>

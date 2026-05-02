@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关于我们 - 管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+</head>
+<body>
+    <div id="app">
+        <front-layout :active-menu="activeMenu">
+            <div class="about-section">
+                <div class="page-container">
+                    <div class="about-header">
+                        <h2>关于我们</h2>
+                        <p>了解我们的团队和使命</p>
+                    </div>
+                    
+                    <div class="about-content">
+                        <el-row :gutter="40">
+                            <el-col :xs="24" :md="12">
+                                <div class="about-text">
+                                    <h3>我们的使命</h3>
+                                    <p>我们致力于为用户提供高效、安全、易用的管理系统解决方案。通过现代化的技术栈和人性化的设计，让管理变得更加简单。</p>
+                                    
+                                    <h3>技术特色</h3>
+                                    <ul>
+                                        <li>基于Flask框架，轻量级高性能</li>
+                                        <li>Vue.js + Element-UI前端技术栈</li>
+                                        <li>MySQL数据库，数据安全可靠</li>
+                                        <li>多角色权限管理，灵活可控</li>
+                                        <li>响应式设计，多设备适配</li>
+                                    </ul>
+                                    
+                                    <h3>联系我们</h3>
+                                    <div class="contact-info">
+                                        <p><i class="el-icon-phone"></i> 联系电话：400-123-4567</p>
+                                        <p><i class="el-icon-message"></i> 邮箱：contact@example.com</p>
+                                        <p><i class="el-icon-location"></i> 地址：*************</p>
+                                    </div>
+                                </div>
+                            </el-col>
+                            
+                            <el-col :xs="24" :md="12">
+                                <div class="about-image">
+                                    <img src="/static/image/about-us.jpg" alt="关于我们" style="width: 100%; border-radius: 8px;">
+                                </div>
+                            </el-col>
+                        </el-row>
+                    </div>
+                    
+                    <div class="team-section" v-if="false">
+                        <h3>核心团队</h3>
+                        <el-row :gutter="20">
+                            <el-col :xs="24" :sm="12" :md="8" v-for="member in teamMembers" :key="member.id">
+                                <el-card class="team-card">
+                                    <div class="member-avatar">
+                                        <el-avatar :size="80" :src="member.avatar"></el-avatar>
+                                    </div>
+                                    <h4>{{ member.name }}</h4>
+                                    <p class="position">{{ member.position }}</p>
+                                    <p class="description">{{ member.description }}</p>
+                                </el-card>
+                            </el-col>
+                        </el-row>
+                    </div>
+                </div>
+            </div>
+        </front-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script src="/static/js/config/theme-config.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: '3',
+                    teamMembers: [
+                        {
+                            id: 1,
+                            name: '张三',
+                            position: '技术总监',
+                            description: '负责系统架构设计和技术选型，拥有10年开发经验',
+                            avatar: '/static/image/profile.png'
+                        },
+                        {
+                            id: 2,
+                            name: '李四',
+                            position: '产品经理',
+                            description: '负责产品规划和用户体验设计，专注用户需求分析',
+                            avatar: '/static/image/profile.png'
+                        },
+                        {
+                            id: 3,
+                            name: '王五',
+                            position: '前端工程师',
+                            description: '负责前端界面开发和交互设计，精通Vue.js技术栈',
+                            avatar: '/static/image/profile.png'
+                        }
+                    ]
+                }
+            }
+        });
+    </script>
+</body>
+</html>

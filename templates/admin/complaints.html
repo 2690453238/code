@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投诉管理 - 后台管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .page-container { padding: 20px; background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,.1); }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e6e6e6; }
+        .page-header h2 { margin: 0; color: #333; font-size: 24px; font-weight: 600; }
+        .stat-cards { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { flex: 1; min-width: 130px; border-radius: 8px; padding: 16px 20px; color: #fff; cursor: pointer; transition: transform .2s; }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-card .num  { font-size: 28px; font-weight: 700; line-height: 1.2; }
+        .stat-card .label{ font-size: 13px; opacity: .85; margin-top: 4px; }
+        .stat-all        { background: linear-gradient(135deg,#667eea,#764ba2); }
+        .stat-pending    { background: linear-gradient(135deg,#f6d365,#fda085); }
+        .stat-processing { background: linear-gradient(135deg,#4facfe,#00f2fe); }
+        .stat-resolved   { background: linear-gradient(135deg,#43e97b,#38f9d7); }
+        .stat-rejected   { background: linear-gradient(135deg,#f77062,#fe5196); }
+        .stat-closed     { background: linear-gradient(135deg,#a8c0ff,#3f2b96); }
+        .search-card { margin-bottom: 16px; }
+        .pagination-container { margin-top: 20px; text-align: center; }
+        .priority-1 { color: #909399; }
+        .priority-2 { color: #e6a23c; font-weight: 600; }
+        .priority-3 { color: #f56c6c; font-weight: 700; }
+        .reply-box { background: #f8fafc; border-radius: 6px; padding: 14px; margin-top: 12px; }
+        .reply-box .label { font-weight: 600; color: #409eff; margin-bottom: 8px; }
+        .detail-block { margin-bottom: 16px; }
+        .detail-block .dt { font-weight: 600; color: #303133; margin-bottom: 6px; font-size: 13px; border-bottom: 1px solid #ebeef5; padding-bottom: 5px; }
+        .detail-block .dd { color: #606266; line-height: 1.7; padding: 6px 0; font-size: 14px; }
+        .images-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+        .images-row img { width: 80px; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #ebeef5; cursor: zoom-in; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <admin-layout :active-menu="activeMenu">
+        <template #content>
+            <div class="page-container">
+
+                <!-- 页面标题 -->
+                <div class="page-header">
+                    <h2><i class="el-icon-warning" style="color:#e6a23c"></i> 投诉管理</h2>
+                </div>
+
+                <!-- 统计卡片 -->
+                <div class="stat-cards">
+                    <div class="stat-card stat-all" @click="filterByStatus('')">
+                        <div class="num">{{ stats.total }}</div>
+                        <div class="label">全部投诉</div>
+                    </div>
+                    <div class="stat-card stat-pending" @click="filterByStatus('pending')">
+                        <div class="num">{{ stats.pending }}</div>
+                        <div class="label">待处理</div>
+                    </div>
+                    <div class="stat-card stat-processing" @click="filterByStatus('processing')">
+                        <div class="num">{{ stats.processing }}</div>
+                        <div class="label">处理中</div>
+                    </div>
+                    <div class="stat-card stat-resolved" @click="filterByStatus('resolved')">
+                        <div class="num">{{ stats.resolved }}</div>
+                        <div class="label">已解决</div>
+                    </div>
+                    <div class="stat-card stat-rejected" @click="filterByStatus('rejected')">
+                        <div class="num">{{ stats.rejected }}</div>
+                        <div class="label">已驳回</div>
+                    </div>
+                    <div class="stat-card stat-closed" @click="filterByStatus('closed')">
+                        <div class="num">{{ stats.closed }}</div>
+                        <div class="label">已关闭</div>
+                    </div>
+                </div>
+
+                <!-- 搜索栏 -->
+                <el-card class="search-card">
+                    <el-form :inline="true" :model="search">
+                        <el-form-item label="关键词">
+                            <el-input v-model="search.keyword" placeholder="投诉单号/标题/用户名" clearable
+                                style="width:220px" @keyup.enter.native="handleSearch"></el-input>
+                        </el-form-item>
+                        <el-form-item label="状态">
+                            <el-select v-model="search.status" placeholder="全部" clearable style="width:120px">
+                                <el-option label="全部"      value=""></el-option>
+                                <el-option label="待处理"   value="pending"></el-option>
+                                <el-option label="处理中"   value="processing"></el-option>
+                                <el-option label="已解决"   value="resolved"></el-option>
+                                <el-option label="已驳回"   value="rejected"></el-option>
+                                <el-option label="已关闭"   value="closed"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item label="类型">
+                            <el-select v-model="search.type" placeholder="全部" clearable style="width:120px">
+                                <el-option label="全部"     value=""></el-option>
+                                <el-option label="订单投诉" value="order"></el-option>
+                                <el-option label="商品投诉" value="product"></el-option>
+                                <el-option label="服务投诉" value="service"></el-option>
+                                <el-option label="平台投诉" value="platform"></el-option>
+                                <el-option label="其他"     value="other"></el-option>
+                            </el-select>
+                        </el-form-item>
+                        <el-form-item>
+                            <el-button type="primary" @click="handleSearch"><i class="el-icon-search"></i> 搜索</el-button>
+                            <el-button @click="handleReset"><i class="el-icon-refresh"></i> 重置</el-button>
+                        </el-form-item>
+                    </el-form>
+                </el-card>
+
+                <!-- 数据表格 -->
+                <el-card>
+                    <el-table :data="tableData" v-loading="loading" stripe style="width:100%">
+                        <el-table-column prop="id" label="ID" width="65" align="center"></el-table-column>
+                        <el-table-column prop="complaintNo" label="投诉单号" ></el-table-column>
+                        <el-table-column label="用户" >
+                            <template slot-scope="s">
+                                <div>{{ s.row.nickname || s.row.username }}</div>
+                                <div style="font-size:12px;color:#909399">{{ s.row.phone }}</div>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="类型" align="center">
+                            <template slot-scope="s">
+                                <el-tag size="mini" type="info" effect="plain">{{ typeLabel[s.row.type] }}</el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column prop="title" label="投诉标题"   show-overflow-tooltip></el-table-column>
+                        <el-table-column label="优先级" width="85" align="center">
+                            <template slot-scope="s">
+                                <span :class="'priority-'+s.row.priority">{{ priorityLabel[s.row.priority] }}</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="状态" align="center">
+                            <template slot-scope="s">
+                                <el-tag size="small" :type="statusType[s.row.status]" effect="plain">
+                                    {{ statusLabel[s.row.status] }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="评分" align="center">
+                            <template slot-scope="s">
+                                <span v-if="s.row.rating" style="color:#e6a23c">{{ s.row.rating }}★</span>
+                                <span v-else style="color:#dcdfe6">—</span>
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="160" align="center" fixed="right">
+                            <template slot-scope="s">
+                                <el-button size="mini" type="primary" @click="handleDetail(s.row)">处理</el-button>
+                                <el-button size="mini" type="danger"  @click="handleDelete(s.row)">删除</el-button>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+
+                    <div class="pagination-container">
+                        <el-pagination
+                            @size-change="handleSizeChange"
+                            @current-change="handleCurrentChange"
+                            :current-page="pagination.pageNum"
+                            :page-sizes="[10,20,50]"
+                            :page-size="pagination.pageSize"
+                            layout="total, sizes, prev, pager, next, jumper"
+                            :total="pagination.total">
+                        </el-pagination>
+                    </div>
+                </el-card>
+            </div>
+
+            <!-- 处理/详情弹窗 -->
+            <el-dialog title="投诉处理" :visible.sync="detailVisible" width="58%" :close-on-click-modal="false">
+                <div v-if="current">
+                    <!-- 基本信息 -->
+                    <el-descriptions :column="2" border size="small" style="margin-bottom:16px">
+                        <el-descriptions-item label="投诉单号" :span="2">{{ current.complaintNo }}</el-descriptions-item>
+                        <el-descriptions-item label="投诉用户">{{ current.nickname || current.username }} ({{ current.phone }})</el-descriptions-item>
+                        <el-descriptions-item label="提交时间">{{ current.createTime }}</el-descriptions-item>
+                        <el-descriptions-item label="投诉类型">{{ typeLabel[current.type] }}</el-descriptions-item>
+                        <el-descriptions-item label="当前状态">
+                            <el-tag size="small" :type="statusType[current.status]" effect="plain">{{ statusLabel[current.status] }}</el-tag>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="关联订单" v-if="current.orderNo" :span="2">{{ current.orderNo }}</el-descriptions-item>
+                    </el-descriptions>
+
+                    <!-- 投诉内容 -->
+                    <div class="detail-block">
+                        <div class="dt">投诉标题</div>
+                        <div class="dd" style="font-weight:600;font-size:15px">{{ current.title }}</div>
+                    </div>
+                    <div class="detail-block">
+                        <div class="dt">投诉内容</div>
+                        <div class="dd">{{ current.content }}</div>
+                    </div>
+                    <div v-if="currentImages.length" class="detail-block">
+                        <div class="dt">投诉凭证</div>
+                        <div class="images-row">
+                            <img v-for="(img,i) in currentImages" :key="i" :src="img" @click="previewImg(img)">
+                        </div>
+                    </div>
+
+                    <!-- 历史回复 -->
+                    <div v-if="current.replyContent" class="detail-block">
+                        <div class="dt">历史回复</div>
+                        <div class="reply-box">
+                            <div class="label"><i class="el-icon-chat-dot-round"></i> 客服回复</div>
+                            <div style="color:#606266;line-height:1.7">{{ current.replyContent }}</div>
+                            <div style="font-size:12px;color:#c0c4cc;margin-top:4px">{{ current.replyTime }}</div>
+                        </div>
+                    </div>
+
+                    <!-- 用户评价 -->
+                    <div v-if="current.rating" class="detail-block">
+                        <div class="dt">用户评价</div>
+                        <div style="display:flex;align-items:center;gap:12px;padding:6px 0">
+                            <el-rate :value="current.rating" disabled></el-rate>
+                            <span style="color:#606266;font-size:13px">{{ current.ratingComment }}</span>
+                        </div>
+                    </div>
+
+                    <el-divider></el-divider>
+
+                    <!-- 回复区 -->
+                    <div v-if="!['resolved','rejected','closed'].includes(current.status) || true">
+                        <div style="font-weight:600;color:#303133;margin-bottom:10px">回复 &amp; 更新状态</div>
+                        <el-form :model="replyForm" ref="replyFormRef" label-width="90px">
+                            <el-form-item label="处理状态" prop="status"
+                                :rules="[{required:true,message:'请选择处理状态',trigger:'change'}]">
+                                <el-select v-model="replyForm.status" style="width:160px">
+                                    <el-option label="处理中" value="processing"></el-option>
+                                    <el-option label="已解决" value="resolved"></el-option>
+                                    <el-option label="已驳回" value="rejected"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="回复内容" prop="replyContent"
+                                :rules="[{required:true,message:'请输入回复内容',trigger:'blur'},
+                                         {min:5,message:'回复内容至少5个字',trigger:'blur'}]">
+                                <el-input v-model="replyForm.replyContent" type="textarea" :rows="4"
+                                    placeholder="请输入回复内容（至少5字）" maxlength="1000" show-word-limit></el-input>
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                </div>
+                <div slot="footer">
+                    <el-button @click="detailVisible=false">取 消</el-button>
+                    <el-button type="primary" @click="handleReply" :loading="replying">提交回复</el-button>
+                </div>
+            </el-dialog>
+
+            <!-- 图片预览 -->
+            <el-dialog :visible.sync="imgDialogVisible" width="45%" title="图片预览" append-to-body>
+                <img :src="imgPreviewUrl" style="width:100%;border-radius:6px">
+            </el-dialog>
+
+        </template>
+    </admin-layout>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            activeMenu: 'complaints',
+            loading: false,
+            replying: false,
+            detailVisible: false,
+            imgDialogVisible: false,
+            imgPreviewUrl: '',
+            tableData: [],
+            current: null,
+            currentImages: [],
+            stats: { total:0, pending:0, processing:0, resolved:0, rejected:0, closed:0 },
+            search: { keyword:'', status:'', type:'' },
+            pagination: { pageNum:1, pageSize:10, total:0 },
+            replyForm: { status:'processing', replyContent:'' },
+            statusLabel: { pending:'待处理', processing:'处理中', resolved:'已解决', rejected:'已驳回', closed:'已关闭' },
+            statusType:  { pending:'warning', processing:'primary', resolved:'success', rejected:'danger',  closed:'info' },
+            typeLabel:   { order:'订单投诉', product:'商品投诉', service:'服务投诉', platform:'平台投诉', other:'其他' },
+            priorityLabel: { 1:'普通', 2:'紧急', 3:'非常紧急' }
+        };
+    },
+    mounted() { this.loadData(); },
+    methods: {
+        loadData() {
+            this.loading = true;
+            axios.get('/api/complaint/admin/list', {
+                params: {
+                    pageNum: this.pagination.pageNum,
+                    pageSize: this.pagination.pageSize,
+                    status: this.search.status,
+                    type: this.search.type,
+                    keyword: this.search.keyword
+                }
+            }).then(res => {
+                if (res.data.code === 200) {
+                    this.tableData = res.data.data.rows || [];
+                    this.pagination.total = res.data.data.total || 0;
+                    const ss = res.data.data.statusStats || {};
+                    this.stats.total      = res.data.data.total || 0;
+                    this.stats.pending    = ss.pending    || 0;
+                    this.stats.processing = ss.processing || 0;
+                    this.stats.resolved   = ss.resolved   || 0;
+                    this.stats.rejected   = ss.rejected   || 0;
+                    this.stats.closed     = ss.closed     || 0;
+                } else {
+                    this.$message.error(res.data.message);
+                }
+            }).catch(() => this.$message.error('加载失败'))
+              .finally(() => { this.loading = false; });
+        },
+        filterByStatus(status) {
+            this.search.status = status;
+            this.pagination.pageNum = 1;
+            this.loadData();
+        },
+        handleSearch() { this.pagination.pageNum = 1; this.loadData(); },
+        handleReset() {
+            this.search = { keyword:'', status:'', type:'' };
+            this.pagination.pageNum = 1;
+            this.loadData();
+        },
+        handleSizeChange(val)    { this.pagination.pageSize = val; this.pagination.pageNum = 1; this.loadData(); },
+        handleCurrentChange(val) { this.pagination.pageNum = val; this.loadData(); },
+        handleDetail(row) {
+            this.current = row;
+            this.currentImages = [];
+            try { this.currentImages = JSON.parse(row.images || '[]'); } catch(e) {}
+            this.replyForm = { status: row.status === 'pending' ? 'processing' : row.status, replyContent: '' };
+            this.detailVisible = true;
+        },
+        handleReply() {
+            this.$refs.replyFormRef.validate(valid => {
+                if (!valid) return;
+                this.replying = true;
+                axios.post('/api/complaint/admin/reply', {
+                    id: this.current.id,
+                    replyContent: this.replyForm.replyContent,
+                    status: this.replyForm.status
+                }).then(res => {
+                    if (res.data.code === 200) {
+                        this.$message.success('回复成功');
+                        this.detailVisible = false;
+                        this.loadData();
+                    } else {
+                        this.$message.error(res.data.message);
+                    }
+                }).catch(() => this.$message.error('提交失败'))
+                  .finally(() => { this.replying = false; });
+            });
+        },
+        handleDelete(row) {
+            this.$confirm('确定删除该投诉记录吗？删除后不可恢复！', '警告', {
+                confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'error'
+            }).then(() => {
+                axios.delete('/api/complaint/admin/delete', { params: { id: row.id } })
+                    .then(res => {
+                        if (res.data.code === 200) {
+                            this.$message.success('删除成功');
+                            this.loadData();
+                        } else {
+                            this.$message.error(res.data.message);
+                        }
+                    }).catch(() => this.$message.error('删除失败'));
+            }).catch(() => {});
+        },
+        previewImg(url) { this.imgPreviewUrl = url; this.imgDialogVisible = true; }
+    }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>社区团长销量预测</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        body { background: #f7f8fc; }
+        .page-wrap { padding: 20px; }
+        .hero {
+            padding: 22px 26px;
+            border-radius: 18px;
+            color: #fff;
+            background: linear-gradient(135deg, #be185d, #7c3aed 55%, #2563eb);
+            box-shadow: 0 18px 38px rgba(124, 58, 237, 0.18);
+        }
+        .hero h2 { margin: 0 0 8px; font-size: 26px; }
+        .hero p { margin: 0; opacity: 0.92; }
+        .toolbar { margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .form-help { margin-top: 12px; color: rgba(255, 255, 255, 0.88); font-size: 13px; line-height: 1.8; }
+        .form-help span { margin-right: 18px; }
+        .kpi-card { margin-top: 20px; border: none; border-radius: 16px; }
+        .kpi-box { padding: 18px 20px; }
+        .kpi-title { color: #64748b; font-size: 13px; }
+        .kpi-value { margin-top: 10px; font-size: 30px; font-weight: 700; color: #0f172a; }
+        .kpi-desc { margin-top: 8px; color: #475569; font-size: 13px; }
+        .chart-card { margin-top: 20px; border-radius: 16px; }
+        .chart-title { display: flex; justify-content: space-between; align-items: center; font-weight: 700; }
+        .explain-card { margin-top: 20px; border-radius: 16px; }
+        .explain-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+        .explain-block { padding: 14px 16px; background: #f8fafc; border-radius: 8px; }
+        .explain-title { margin-bottom: 8px; font-weight: 700; color: #0f172a; }
+        .explain-text { color: #475569; font-size: 13px; line-height: 1.8; }
+        @media (max-width: 768px) {
+            .explain-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <admin-layout :active-menu="activeMenu">
+        <template #content>
+            <div class="page-wrap" v-loading="pageLoading">
+                <div class="hero">
+                    <h2>社区团长销量预测中心</h2>
+                    <p>基于本团长历史订单训练销量预测模型，执行批量预测并观察未来销售变化。</p>
+                    <div class="toolbar">
+                        <el-input-number v-model="forecastDays"  :min="3" :max="30" label="预测天数"></el-input-number>
+                        <el-input-number v-model="testDays" :min="7" :max="30" label="评估天数"></el-input-number>
+                        <el-button type="primary" icon="el-icon-cpu" :loading="trainLoading" @click="trainModel">训练模型</el-button>
+                        <el-tooltip content="不重新训练模型，按当前参数重新获取预测和图表数据" placement="top">
+                            <el-button icon="el-icon-refresh" @click="loadAll">刷新结果</el-button>
+                        </el-tooltip>
+                        <el-tag type="success" v-if="dashboard.overview.trainedAt">最近训练：{{ dashboard.overview.trainedAt }}</el-tag>
+                    </div>
+                    <div class="form-help">
+                        <span>预测天数：从今天起向后预测的天数，影响趋势图和商品预测明细。</span>
+                        <span>评估天数：从历史末尾划出多少天做测试集，影响模型误差。</span>
+                        <span>训练模型：重新训练并保存模型；刷新结果：复用已保存模型和当日预测缓存重新展示。</span>
+                    </div>
+                </div>
+
+                <el-row :gutter="16">
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="kpi-card">
+                            <div class="kpi-box">
+                                <div class="kpi-title">覆盖商品数</div>
+                                <div class="kpi-value">{{ dashboard.overview.productCount || 0 }}</div>
+                                <div class="kpi-desc">{{ dashboard.overview.scopeName || '当前社区团长' }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="kpi-card">
+                            <div class="kpi-box">
+                                <div class="kpi-title">近 7 天实际销量</div>
+                                <div class="kpi-value">{{ numFmt(dashboard.overview.last7DaysSales) }}</div>
+                                <div class="kpi-desc">历史总销量：{{ numFmt(dashboard.overview.historyTotal) }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="kpi-card">
+                            <div class="kpi-box">
+                                <div class="kpi-title">未来 7 天预测销量</div>
+                                <div class="kpi-value">{{ numFmt(dashboard.overview.next7DaysForecast) }}</div>
+                                <div class="kpi-desc">预测总量：{{ numFmt(dashboard.overview.forecastTotal) }}</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :sm="12" :lg="6">
+                        <el-card class="kpi-card">
+                            <div class="kpi-box">
+                                <div class="kpi-title">MAPE</div>
+                                <div class="kpi-value">{{ dashboard.metrics.mape || 0 }}%</div>
+                                <div class="kpi-desc">模型误差越低越好</div>
+                            </div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-row :gutter="16">
+                    <el-col :xs="24" :lg="16">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>本社区销售趋势与预测</span>
+                                <el-tag size="mini" type="warning">未来 {{ forecastDays }} 天</el-tag>
+                            </div>
+                            <div id="trendChart" style="height: 360px;"></div>
+                        </el-card>
+                    </el-col>
+                    <el-col :xs="24" :lg="8">
+                        <el-card class="chart-card">
+                            <div slot="header" class="chart-title">
+                                <span>品类预测分布</span>
+                            </div>
+                            <div id="categoryChart" style="height: 360px;"></div>
+                        </el-card>
+                    </el-col>
+                </el-row>
+
+                <el-card class="explain-card" v-show="false">
+                    <div slot="header" class="chart-title">
+                        <span>参数说明</span>
+                        <el-tag size="mini" type="success">预测从今天开始</el-tag>
+                    </div>
+                    <div class="explain-grid">
+                        <div class="explain-block">
+                            <div class="explain-title">预测天数</div>
+                            <div class="explain-text">
+                                控制从今天起向后预测的天数，例如 7 表示预测今天至未来第 7 天的销量，销量按整数件数展示。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">评估天数</div>
+                            <div class="explain-text">
+                                从本团长历史数据末尾切出最近若干天作为测试集，用于计算模型误差。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">MAPE</div>
+                            <div class="explain-text">
+                                平均绝对百分比误差，越低表示预测越接近实际销量。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">采购建议</div>
+                            <div class="explain-text">
+                                建议采购量 = 预测销量 + 15% 安全库存 - 当前库存，小于 0 时按 0 处理。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">模型特征</div>
+                            <div class="explain-text">
+                                综合历史销量、近 7 日均值、近 14 日累计、季节、周末、节假日、库存和促销折扣。
+                            </div>
+                        </div>
+                        <div class="explain-block">
+                            <div class="explain-title">日期口径</div>
+                            <div class="explain-text">
+                                预测结果固定从系统当天开始；样例库若有今天之后订单，预测时不会作为历史输入。
+                            </div>
+                        </div>
+                    </div>
+                </el-card>
+
+                <el-card class="chart-card">
+                    <div slot="header" class="chart-title">
+                        <span>批量预测商品明细</span>
+                        <el-tag size="mini" type="info">预测销量前 50</el-tag>
+                    </div>
+                    <el-table :data="batchData.productPredictions" stripe>
+                        <el-table-column prop="productName" label="商品名称" min-width="240"></el-table-column>
+                        <el-table-column prop="categoryName" label="品类" width="140"></el-table-column>
+                        <el-table-column prop="forecastQuantity" label="预测销量" width="120" align="right"></el-table-column>
+                        <el-table-column prop="currentStock" label="当前库存" width="120" align="right"></el-table-column>
+                        <el-table-column prop="safetyStock" label="安全库存" width="120" align="right"></el-table-column>
+                        <el-table-column label="建议采购" width="120" align="right">
+                            <template slot-scope="scope">
+                                {{ scope.row.purchaseAdvice ? scope.row.purchaseAdvice.suggestedQuantity : 0 }}
+                            </template>
+                        </el-table-column>
+                        <el-table-column label="库存风险" width="110" align="center">
+                            <template slot-scope="scope">
+                                <el-tag :type="riskTagType(scope.row.purchaseAdvice)" size="mini">
+                                    {{ riskText(scope.row.purchaseAdvice) }}
+                                </el-tag>
+                            </template>
+                        </el-table-column>
+                    </el-table>
+                </el-card>
+            </div>
+        </template>
+    </admin-layout>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/echarts.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            activeMenu: 'community-sales-forecast',
+            pageLoading: false,
+            trainLoading: false,
+            forecastDays: 7,
+            testDays: 14,
+            dashboard: {
+                overview: {},
+                trend: { historyDates: [], historySales: [], forecastDates: [], forecastSales: [] },
+                categoryForecast: [],
+                metrics: {}
+            },
+            batchData: { productPredictions: [] },
+            charts: {}
+        };
+    },
+    mounted() {
+        this.loadAll();
+        window.addEventListener('resize', this.resizeCharts);
+    },
+    beforeDestroy() {
+        window.removeEventListener('resize', this.resizeCharts);
+    },
+    methods: {
+        getParams() {
+            return { forecastDays: this.forecastDays, testDays: this.testDays, trendDays: 30 };
+        },
+        async loadAll() {
+            this.pageLoading = true;
+            try {
+                const [dashboardRes, batchRes] = await Promise.all([
+                    axios.get('/api/analytics/forecast/sales/dashboard', { params: this.getParams() }),
+                    axios.get('/api/analytics/forecast/sales/batch', { params: this.getParams() })
+                ]);
+                if (dashboardRes.data.code === 200) {
+                    this.dashboard = dashboardRes.data.data;
+                }
+                if (batchRes.data.code === 200) {
+                    this.batchData = batchRes.data.data;
+                }
+                this.$nextTick(this.renderCharts);
+            } catch (error) {
+                this.$message.error('加载社区销量预测看板失败');
+            } finally {
+                this.pageLoading = false;
+            }
+        },
+        async trainModel() {
+            this.trainLoading = true;
+            try {
+                const response = await axios.post('/api/analytics/forecast/sales/train', null, { params: this.getParams() });
+                if (response.data.code !== 200) {
+                    this.$message.error(response.data.message || '训练失败');
+                    return;
+                }
+                this.$message.success('模型训练完成');
+                await this.loadAll();
+            } catch (error) {
+                this.$message.error('训练销量预测模型失败');
+            } finally {
+                this.trainLoading = false;
+            }
+        },
+        getChart(id) {
+            const el = document.getElementById(id);
+            if (!el) {
+                return null;
+            }
+            if (!this.charts[id]) {
+                this.charts[id] = echarts.init(el);
+            }
+            return this.charts[id];
+        },
+        renderCharts() {
+            this.renderTrendChart();
+            this.renderCategoryChart();
+        },
+        renderTrendChart() {
+            const chart = this.getChart('trendChart');
+            if (!chart) {
+                return;
+            }
+            const trend = this.dashboard.trend || {};
+            const historyDates = trend.historyDates || [];
+            const forecastDates = trend.forecastDates || [];
+            const xAxisData = historyDates.concat(forecastDates);
+            const historySales = (trend.historySales || []).concat(new Array(forecastDates.length).fill(null));
+            const forecastSales = new Array(historyDates.length).fill(null).concat(trend.forecastSales || []);
+            chart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { data: ['历史销量', '预测销量'] },
+                grid: { left: 40, right: 20, top: 40, bottom: 30 },
+                xAxis: { type: 'category', data: xAxisData, boundaryGap: false },
+                yAxis: { type: 'value', name: '销量' },
+                series: [
+                    {
+                        name: '历史销量',
+                        type: 'bar',
+                        data: historySales,
+                        itemStyle: { color: '#7c3aed' },
+                        barMaxWidth: 34
+                    },
+                    {
+                        name: '预测销量',
+                        type: 'line',
+                        smooth: true,
+                        data: forecastSales,
+                        lineStyle: { width: 3, color: '#2563eb' },
+                        itemStyle: { color: '#2563eb' }
+                    }
+                ]
+            });
+        },
+        renderCategoryChart() {
+            const chart = this.getChart('categoryChart');
+            if (!chart) {
+                return;
+            }
+            chart.setOption({
+                tooltip: { trigger: 'item' },
+                series: [{
+                    type: 'pie',
+                    radius: ['36%', '70%'],
+                    data: (this.dashboard.categoryForecast || []).map(item => ({
+                        name: item.category,
+                        value: item.quantity
+                    }))
+                }]
+            });
+        },
+        resizeCharts() {
+            Object.keys(this.charts).forEach(key => {
+                if (this.charts[key]) {
+                    this.charts[key].resize();
+                }
+            });
+        },
+        riskTagType(advice) {
+            const level = advice ? advice.riskLevel : 'low';
+            const map = { high: 'danger', medium: 'warning', low: 'success' };
+            return map[level] || 'info';
+        },
+        riskText(advice) {
+            const level = advice ? advice.riskLevel : 'low';
+            const map = { high: '高风险', medium: '需补货', low: '充足' };
+            return map[level] || '未知';
+        },
+        numFmt(value) {
+            return Number(value || 0).toFixed(2);
+        }
+    }
+});
+</script>
+</body>
+</html>

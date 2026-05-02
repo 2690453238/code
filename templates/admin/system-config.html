@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统管理与配置</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .config-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .config-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 14px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            color: #606266;
+            min-width: 100px;
+        }
+
+        .config-value {
+            color: #303133;
+            font-weight: 600;
+            text-align: right;
+            word-break: break-all;
+        }
+
+        .page-desc {
+            color: #909399;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="config-container">
+                    <el-card>
+                        <div>
+                            <h2>系统配置</h2>
+                        </div>
+                    </el-card>
+
+                    <div class="config-grid">
+                        <el-card>
+                            <div slot="header">
+                                <span>系统信息</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">系统名称</span>
+                                <span class="config-value">{{ systemTitle }}</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">当前角色</span>
+                                <span class="config-value">{{ currentRoleText }}</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">角色首页</span>
+                                <span class="config-value">{{ homePage }}</span>
+                            </div>
+                        </el-card>
+
+                        <el-card>
+                            <div slot="header">
+                                <span>后台入口</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">系统管理与配置</span>
+                                <span class="config-value">/admin/system-config.html</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">个人中心</span>
+                                <span class="config-value">/admin/profile.html</span>
+                            </div>
+                            <div class="config-item">
+                                <span class="config-label">用户管理</span>
+                                <span class="config-value">/admin/users.html</span>
+                            </div>
+                        </el-card>
+
+                        <el-card>
+                            <div slot="header">
+                                <span>角色说明</span>
+                            </div>
+                            <div v-for="role in roles" :key="role.value" class="config-item">
+                                <span class="config-label">{{ role.label }}</span>
+                                <span class="config-value">{{ role.description }}</span>
+                            </div>
+                        </el-card>
+                    </div>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                const rawUserInfo = localStorage.getItem('userInfo') || sessionStorage.getItem('userInfo') || '{}';
+                const userInfo = JSON.parse(rawUserInfo);
+                return {
+                    activeMenu: 'system-config',
+                    userInfo: userInfo,
+                    systemTitle: LayoutConfig.system.title,
+                    roles: Object.values(LayoutConfig.roles)
+                };
+            },
+            computed: {
+                currentRoleText() {
+                    return LayoutConfig.utils.getRoleLabel(this.userInfo.role || '');
+                },
+                homePage() {
+                    return LayoutConfig.utils.getRoleHomePage(this.userInfo.role || '');
+                }
+            }
+        });
+    </script>
+</body>
+</html>

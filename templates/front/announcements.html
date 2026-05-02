@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新闻公告 - 管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+</head>
+<body>
+    <div id="app">
+        <front-layout :active-menu="activeMenu"> 
+                <div class="page-container">
+                    <!-- 页面标题 -->
+                    <!-- <div class="page-header">
+                        <h2>新闻公告</h2>
+                        <p>了解最新动态和重要通知</p>
+                    </div> -->
+
+                    <!-- 搜索和筛选区域 -->
+                    <el-card class="search-card">
+                        <el-form :inline="true" :model="searchForm" class="search-form">
+                            <el-form-item label="关键词">
+                                <el-input 
+                                    v-model="searchForm.keyword" 
+                                    placeholder="请输入标题或内容关键词"
+                                    clearable
+                                    @keyup.enter.native="handleSearch">
+                                </el-input>
+                            </el-form-item>
+                            <!-- <el-form-item label="发布时间">
+                                <el-date-picker
+                                    v-model="searchForm.dateRange"
+                                    type="daterange"
+                                    range-separator="至"
+                                    start-placeholder="开始日期"
+                                    end-placeholder="结束日期"
+                                    format="yyyy-MM-dd"
+                                    value-format="yyyy-MM-dd">
+                                </el-date-picker>
+                            </el-form-item> -->
+                            <el-form-item>
+                                <el-button type="primary" @click="handleSearch" :loading="loading">
+                                    <i class="el-icon-search"></i> 搜索
+                                </el-button>
+                                <el-button @click="handleReset">
+                                    <i class="el-icon-refresh"></i> 重置
+                                </el-button>
+                            </el-form-item>
+                        </el-form>
+                    </el-card>
+
+                    <!-- 公告列表 -->
+                    <el-card class="announcement-list-card">
+                        <div slot="header" class="card-header">
+                            <span>公告列表</span>
+                            <el-button type="text" @click="loadAnnouncements" :loading="loading">
+                                <i class="el-icon-refresh"></i> 刷新
+                            </el-button>
+                        </div>
+
+                        <!-- 加载状态 -->
+                        <div v-loading="loading" class="announcement-list">
+                            <!-- 空状态 -->
+                            <div v-if="!loading && announcements.length === 0" class="empty-state">
+                                <i class="el-icon-document"></i>
+                                <p>暂无公告信息</p>
+                                <el-button type="primary" @click="loadAnnouncements">重新加载</el-button>
+                            </div>
+
+                            <!-- 公告列表 -->
+                            <div v-else>
+                                <div 
+                                    v-for="(announcement, index) in announcements" 
+                                    :key="announcement.id"
+                                    class="announcement-item"
+                                    @click="viewAnnouncement(announcement)">
+                                    <div class="announcement-content">
+                                        <div class="announcement-header">
+                                            <h4 class="announcement-title">
+                                                <span v-if="announcement.isTop" class="top-tag">置顶</span>
+                                                {{ announcement.title }}
+                                            </h4>
+                                            <div class="announcement-meta">
+                                                <span class="time">
+                                                    <i class="el-icon-time"></i>
+                                                    {{ announcement.createTime }}
+                                                </span>
+                                                <span class="author">
+                                                    <i class="el-icon-user"></i>
+                                                    {{ announcement.author }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="announcement-summary" v-html="getAnnouncementSummary(announcement)"></div>
+                                    </div>
+                                    <div class="announcement-actions">
+                                        <i class="el-icon-arrow-right"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 分页 -->
+                        <div v-if="total > 0" class="pagination-container">
+                            <el-pagination
+                                @size-change="handleSizeChange"
+                                @current-change="handleCurrentChange"
+                                :current-page="pagination.page"
+                                :page-sizes="[10, 20, 50, 100]"
+                                :page-size="pagination.limit"
+                                layout="total, sizes, prev, pager, next, jumper"
+                                :total="total">
+                            </el-pagination>
+                        </div>
+                    </el-card>
+                </div> 
+        </front-layout>
+        
+        <!-- 公告详情对话框 -->
+        <el-dialog
+            title="公告详情"
+            :visible.sync="detailDialogVisible"
+            width="60%"
+            :before-close="handleCloseDetail"
+            custom-class="announcement-detail-dialog">
+            <div v-if="currentAnnouncement" class="announcement-detail-content">
+                <div class="announcement-detail-header">
+                    <h2 class="announcement-detail-title">
+                        <span v-if="currentAnnouncement.isTop" class="top-tag">置顶</span>
+                        {{ currentAnnouncement.title }}
+                    </h2>
+                    <div class="announcement-detail-meta">
+                        <span class="announcement-detail-author">
+                            <i class="el-icon-user"></i>
+                            {{ currentAnnouncement.author }}
+                        </span>
+                        <span class="announcement-detail-time">
+                            <i class="el-icon-time"></i>
+                            {{ currentAnnouncement.createTime }}
+                        </span>
+                        <span class="announcement-detail-views">
+                            <i class="el-icon-view"></i>
+                            {{ currentAnnouncement.viewCount || 0 }} 次浏览
+                        </span>
+                    </div>
+                </div>
+                <div class="announcement-detail-body" v-html="getProcessedContent(currentAnnouncement.content)"></div>
+            </div>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="detailDialogVisible = false">关闭</el-button>
+            </div>
+        </el-dialog>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/config/theme-config.js"></script>
+    <script src="/static/js/components/layout.js"></script> 
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: '2',
+                    loading: false,
+                    announcements: [],
+                    total: 0,
+                    searchForm: {
+                        keyword: '',
+                        dateRange: null
+                    },
+                    pagination: {
+                        page: 1,
+                        limit: 10
+                    },
+                    detailDialogVisible: false,
+                    currentAnnouncement: null
+                }
+            },
+            mounted() {
+                this.loadAnnouncements();
+            },
+            methods: {
+                // 加载公告列表
+                loadAnnouncements() {
+                    this.loading = true;
+                    
+                    const params = {
+                        page: this.pagination.page,
+                        limit: this.pagination.limit
+                    };
+
+                    // 添加搜索条件
+                    if (this.searchForm.keyword) {
+                        params.keyword = this.searchForm.keyword;
+                    }
+                    if (this.searchForm.dateRange && this.searchForm.dateRange.length === 2) {
+                        params.startDate = this.searchForm.dateRange[0];
+                        params.endDate = this.searchForm.dateRange[1];
+                    }
+
+                    axios.get('/api/announcement/front/list', { params })
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.announcements = response.data.data.rows || [];
+                                this.total = response.data.data.total || 0;
+                            } else {
+                                this.$message.error(response.data.message);
+                                this.announcements = [];
+                                this.total = 0;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载公告失败:', error);
+                            this.$message.error('加载公告失败');
+                            this.announcements = [];
+                            this.total = 0;
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                        });
+                },
+
+                // 搜索
+                handleSearch() {
+                    this.pagination.page = 1;
+                    this.loadAnnouncements();
+                },
+
+                // 重置搜索
+                handleReset() {
+                    this.searchForm = {
+                        keyword: '',
+                        dateRange: null
+                    };
+                    this.pagination.page = 1;
+                    this.loadAnnouncements();
+                },
+
+                // 获取公告摘要（处理图片显示问题）
+                getAnnouncementSummary(announcement) {
+                    // 优先使用摘要字段
+                    if (announcement.summary) {
+                        return announcement.summary;
+                    }
+                    
+                    // 如果没有摘要，从内容中提取（去除HTML标签和图片）
+                    let content = announcement.content || '';
+                    
+                    // 移除所有HTML标签
+                    content = content.replace(/<[^>]*>/g, '');
+                    
+                    // 限制长度
+                    if (content.length > 150) {
+                        content = content.substring(0, 150) + '...';
+                    }
+                    
+                    return content;
+                },
+
+                // 查看公告详情
+                async viewAnnouncement(announcement) {
+                    try {
+                        // 调用后端接口获取公告详情（会增加浏览次数）
+                        const response = await axios.get('/api/announcement/front/detail', {
+                            params: { id: announcement.id }
+                        });
+                        
+                        if (response.data.code === 200) {
+                            const detailData = response.data.data;
+                            
+                            // 设置当前公告数据
+                            this.currentAnnouncement = detailData;
+                            this.detailDialogVisible = true;
+                            
+                            // 更新本地数据中的浏览次数
+                            const index = this.announcements.findIndex(item => item.id === announcement.id);
+                            if (index !== -1) {
+                                this.announcements[index].viewCount = detailData.viewCount;
+                            }
+                        } else {
+                            this.$message.error(response.data.message || '获取公告详情失败');
+                        }
+                    } catch (error) {
+                        console.error('获取公告详情失败:', error);
+                        this.$message.error('获取公告详情失败');
+                        
+                        // 如果接口调用失败，仍然显示本地数据
+                        this.currentAnnouncement = announcement;
+                        this.detailDialogVisible = true;
+                    }
+                },
+
+                // 处理内容显示
+                getProcessedContent(content) {
+                    if (!content) return '';
+                    
+                    // 为图片添加响应式样式
+                    let processedContent = content.replace(/<img([^>]*)>/gi, 
+                        '<img$1 style="max-width: 100%; height: auto; display: block; margin: 10px auto; border-radius: 4px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">');
+                    
+                    return processedContent;
+                },
+
+                // 关闭详情对话框
+                handleCloseDetail() {
+                    this.detailDialogVisible = false;
+                    this.currentAnnouncement = null;
+                },
+
+                // 分页大小改变
+                handleSizeChange(val) {
+                    this.pagination.limit = val;
+                    this.pagination.page = 1;
+                    this.loadAnnouncements();
+                },
+
+                // 当前页改变
+                handleCurrentChange(val) {
+                    this.pagination.page = val;
+                    this.loadAnnouncements();
+                }
+            }
+        });
+    </script>
+
+    <style scoped>
+        .page-container {
+            max-width: 90%;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .page-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .page-header h2 {
+            color: #e8a81a;
+            margin-bottom: 10px;
+        }
+
+        .page-header p {
+            color: #64748b;
+            font-size: 16px;
+        }
+
+        .search-card {
+            margin-bottom: 20px;
+        }
+
+        .search-form {
+            margin: 0;
+        }
+
+        .announcement-list-card {
+            margin-bottom: 20px;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .announcement-list {
+            min-height: 200px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #cbd5e1;
+        }
+
+        .empty-state p {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+
+        /* 公告详情对话框样式 */
+        .announcement-detail-dialog .el-dialog {
+            max-width: 1000px;
+            margin: 5vh auto;
+        }
+
+        .announcement-detail-dialog .el-dialog__body {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .announcement-detail-content {
+            line-height: 1.6;
+        }
+
+        .announcement-detail-header {
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+        }
+
+        .announcement-detail-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1e293b;
+            margin: 0 0 15px 0;
+            line-height: 1.4;
+        }
+
+        .announcement-detail-meta {
+            display: flex;
+            gap: 20px;
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .announcement-detail-meta span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .announcement-detail-meta i {
+            font-size: 16px;
+        }
+
+        .announcement-detail-body {
+            font-size: 16px;
+            color: #334155;
+            line-height: 1.8;
+        }
+
+        .announcement-detail-body img {
+            max-width: 100% !important;
+            height: auto !important;
+            display: block !important;
+            margin: 15px auto !important;
+            border-radius: 6px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .announcement-detail-body p {
+            margin: 15px 0;
+        }
+
+        .announcement-detail-body h1,
+        .announcement-detail-body h2,
+        .announcement-detail-body h3 {
+            margin: 20px 0 15px 0;
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .announcement-detail-body h1 {
+            font-size: 22px;
+        }
+
+        .announcement-detail-body h2 {
+            font-size: 20px;
+        }
+
+        .announcement-detail-body h3 {
+            font-size: 18px;
+        }
+
+        .announcement-detail-body ul,
+        .announcement-detail-body ol {
+            margin: 15px 0;
+            padding-left: 30px;
+        }
+
+        .announcement-detail-body li {
+            margin: 8px 0;
+        }
+
+        .announcement-detail-body blockquote {
+            border-left: 4px solid #e8a81a;
+            background: #fdf5f5;
+            padding: 15px 20px;
+            margin: 20px 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .announcement-detail-body code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        .announcement-detail-body pre {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .announcement-detail-body pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .announcement-item {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .announcement-item:hover {
+            background-color: #f8fafc;
+            transform: translateX(5px);
+        }
+
+        .announcement-item:last-child {
+            border-bottom: none;
+        }
+
+        .announcement-content {
+            flex: 1;
+        }
+
+        .announcement-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .announcement-title {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            line-height: 1.4;
+        }
+
+        .top-tag {
+            display: inline-block;
+            background: linear-gradient(45deg, #ef4444, #f87171);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-weight: 500;
+        }
+
+        .announcement-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #64748b;
+        }
+
+        .announcement-meta i {
+            margin-right: 4px;
+        }
+
+        .announcement-summary {
+            margin: 0;
+            color: #64748b;
+            line-height: 1.6;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .announcement-actions {
+            margin-left: 20px;
+            color: #94a3b8;
+            font-size: 18px;
+        }
+
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .page-container {
+                padding: 10px;
+            }
+
+            .announcement-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .announcement-meta {
+                margin-top: 8px;
+                gap: 15px;
+            }
+
+            .announcement-item {
+                padding: 15px;
+            }
+        }
+    </style>
+</body>
+</html>

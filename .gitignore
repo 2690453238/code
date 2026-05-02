@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Uploads (user generated content)
+upload/
+
+# Environment
+.env
+*.env.local
+
+# OS
+Thumbs.db
+.DS_Store

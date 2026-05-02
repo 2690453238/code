@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单详情</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/front.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --ink:#f3f3f3;--deep:#ffffff;--panel:#f8f8f8;
+            --rose:#e94560;--blush:#ff6b8a;--gold:#f5a623;
+            --mist:#525252;--light:#757575;
+            --surface:rgba(230, 0, 0, 0.04);
+            --border:rgba(223, 0, 0, 0.15);
+        }
+        body{background:var(--ink);font-family:'Noto Serif SC',serif;color:var(--light);}
+        .od-wrap{max-width:90%;margin:0 auto;padding:32px 20px 60px;}
+        .od-breadcrumb{display:flex;align-items:center;gap:8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--mist);margin-bottom:28px;letter-spacing:.04em;}
+        .od-breadcrumb a{color:var(--mist);text-decoration:none;}
+        .od-breadcrumb a:hover{color:var(--blush);}
+        .od-breadcrumb .sep{opacity:.4;} .od-breadcrumb .cur{color:var(--light);}
+        .od-hero{position:relative;border-radius:16px;overflow:hidden;margin-bottom:28px;padding:36px 40px;background:linear-gradient(135deg,var(--panel) 0%,#1a1a3e 100%);border:1px solid var(--border);}
+        .od-hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 120% at 80% 50%,rgba(233,69,96,.18) 0%,transparent 70%),radial-gradient(ellipse 40% 60% at 10% 80%,rgba(245,166,35,.1) 0%,transparent 60%);pointer-events:none;}
+        .od-hero-top{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:28px;}
+        .od-order-no{font-family:'DM Mono',monospace;font-size:13px;color:var(--mist);margin-bottom:6px;letter-spacing:.06em;}
+        .od-order-no span{color:var(--gold);font-weight:500;}
+        .od-status-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:40px;font-size:14px;font-weight:600;letter-spacing:.06em;}
+        .od-status-badge::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor;animation:pulse 1.8s ease-in-out infinite;}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(.7);}}
+        .od-status-badge.pending{background:rgba(245,166,35,.15);color:var(--gold);border:1px solid rgba(245,166,35,.3);}
+        .od-status-badge.paid{background:rgba(82,196,26,.15);color:#52c41a;border:1px solid rgba(82,196,26,.3);}
+        .od-status-badge.shipped{background:rgba(24,144,255,.15);color:#1890ff;border:1px solid rgba(24,144,255,.3);}
+        .od-status-badge.delivered{background:rgba(168,178,216,.15);color:var(--mist);border:1px solid var(--border);}
+        .od-status-badge.completed{background:rgba(233,69,96,.15);color:var(--blush);border:1px solid rgba(233,69,96,.3);}
+        .od-status-badge.cancelled{background:rgba(255,255,255,.06);color:#888;border:1px solid rgba(255,255,255,.1);}
+        .od-status-badge.cancel_requested{background:rgba(245,166,35,.1);color:#faad14;border:1px solid rgba(245,166,35,.25);}
+        .od-meta-row{display:flex;gap:40px;flex-wrap:wrap;}
+        .od-meta-item{display:flex;flex-direction:column;gap:4px;}
+        .od-meta-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--mist);letter-spacing:.08em;text-transform:uppercase;}
+        .od-meta-val{font-size:15px;color:var(--light);font-weight:600;}
+        .od-meta-val.price{color:var(--rose);font-size:20px;}
+        .od-body{display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start;}
+        .od-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:20px;}
+        .od-card-title{font-size:14px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mist);margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+        .od-card-title::before{content:'';display:block;width:3px;height:16px;background:var(--rose);border-radius:2px;}
+        .od-product-item{display:flex;align-items:flex-start;gap:16px;padding:18px 0;border-bottom:1px solid var(--border);}
+        .od-product-item:last-child{border-bottom:none;padding-bottom:0;}
+        .od-product-img{width:76px;height:76px;object-fit:cover;border-radius:10px;flex-shrink:0;border:1px solid var(--border);}
+        .od-product-body{flex:1;min-width:0;}
+        .od-product-name{font-size:15px;font-weight:600;color:var(--light);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+        .od-product-sku{font-size:12px;color:var(--mist);margin-bottom:8px;font-family:'DM Mono',monospace;}
+        .od-product-price-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+        .od-unit-price{font-size:13px;color:var(--mist);}
+        .od-qty-badge{background:rgba(168,178,216,.12);border:1px solid var(--border);border-radius:6px;padding:2px 10px;font-family:'DM Mono',monospace;font-size:13px;color:var(--mist);}
+        .od-subtotal{font-weight:700;color:var(--rose);font-size:15px;}
+        .od-review-box{margin-top:10px;padding:12px 14px;background:rgba(233,69,96,.06);border:1px solid rgba(233,69,96,.15);border-radius:8px;}
+        .od-review-text{font-size:13px;color:var(--mist);line-height:1.6;margin-bottom:4px;}
+        .od-review-time{font-size:11px;color:#666;font-family:'DM Mono',monospace;}
+        .od-addr-name{font-size:16px;font-weight:700;color:var(--light);margin-bottom:4px;}
+        .od-addr-phone{font-family:'DM Mono',monospace;font-size:13px;color:var(--gold);margin-bottom:10px;}
+        .od-addr-text{font-size:14px;color:var(--mist);line-height:1.8;}
+        .od-summary-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:14px;color:var(--mist);border-bottom:1px solid var(--border);}
+        .od-summary-row:last-child{border-bottom:none;}
+        .od-summary-row.grand{padding-top:14px;font-size:17px;font-weight:700;color:var(--light);}
+        .od-summary-row.grand .val{color:var(--rose);font-size:22px;}
+        .od-ship-row{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px;}
+        .od-ship-row:last-child{border-bottom:none;}
+        .od-ship-label{min-width:80px;flex-shrink:0;color:var(--mist);font-family:'DM Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding-top:2px;}
+        .od-ship-val{color:var(--light);line-height:1.7;word-break:break-all;white-space:pre-line;}
+        .od-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+        .od-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 28px;border-radius:40px;font-size:14px;font-weight:600;font-family:'Noto Serif SC',serif;cursor:pointer;transition:all .22s;border:none;letter-spacing:.04em;}
+        .od-btn-ghost{background:transparent;border:1px solid var(--border);color:var(--mist);}
+        .od-btn-ghost:hover{border-color:var(--mist);color:var(--light);}
+        .od-btn-primary{background:var(--rose);color:#fff;box-shadow:0 4px 20px rgba(233,69,96,.35);}
+        .od-btn-primary:hover{background:var(--blush);transform:translateY(-2px);}
+        .od-btn-success{background:#27ae60;color:#fff;box-shadow:0 4px 16px rgba(39,174,96,.3);}
+        .od-btn-success:hover{background:#2ecc71;transform:translateY(-2px);}
+        .od-btn-danger{background:transparent;border:1px solid rgba(233,69,96,.4);color:var(--rose);}
+        .od-btn-danger:hover{background:rgba(233,69,96,.1);border-color:var(--rose);}
+        .od-state-box{text-align:center;padding:80px 20px;color:var(--mist);}
+        .od-state-box i{font-size:48px;display:block;margin-bottom:16px;color:var(--rose);}
+        .od-state-box p{font-size:15px;margin-bottom:20px;}
+        .el-dialog{background:var(--deep) !important;border:1px solid var(--border) !important;border-radius:14px !important;}
+        .el-dialog__title{color:var(--light) !important;}
+        .el-dialog__headerbtn .el-dialog__close{color:var(--mist) !important;}
+        .review-product-box{display:flex;align-items:center;gap:14px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:20px;}
+        .review-product-box img{width:56px;height:56px;object-fit:cover;border-radius:8px;}
+        .review-product-pname{font-size:14px;font-weight:600;color:var(--light);margin-bottom:4px;}
+        .review-product-sku{font-size:12px;color:var(--mist);}
+        .rform-label{font-size:13px;color:var(--mist);margin-bottom:8px;display:block;font-family:'DM Mono',monospace;letter-spacing:.06em;}
+        .rform-section{margin-bottom:18px;}
+        .el-textarea__inner{background:var(--surface) !important;border-color:var(--border) !important;color:var(--light) !important;border-radius:8px !important;}
+        @media(max-width:860px){.od-body{grid-template-columns:1fr;}.od-hero{padding:24px 20px;}.od-meta-row{gap:20px;}}
+    </style>
+</head>
+
+<body>
+<div id="app">
+    <front-layout :user-info="userInfo" current-nav="user">
+        <div class="od-wrap"> 
+            <div v-if="loading" class="od-state-box">
+                <i class="el-icon-loading"></i>
+                <p>正在加载订单信息…</p>
+            </div>
+            <div v-else-if="error" class="od-state-box">
+                <i class="el-icon-warning-outline"></i>
+                <p>{{ error }}</p>
+                <button class="od-btn od-btn-primary" @click="loadOrderDetail">重新加载</button>
+            </div>
+            <div v-else-if="order">
+                <div class="od-hero">
+                    <div class="od-hero-top">
+                        <div>
+                            <div class="od-order-no">ORDER &nbsp;<span>{{ order.orderNo }}</span></div>
+                        </div>
+                        <div class="od-status-badge" :class="order.status">{{ getStatusText(order.status) }}</div>
+                    </div>
+                    <div class="od-meta-row">
+                        <div class="od-meta-item">
+                            <span class="od-meta-label">下单时间</span>
+                            <span class="od-meta-val">{{ order.createTime }}</span>
+                        </div>
+                        <div class="od-meta-item">
+                            <span class="od-meta-label">支付方式</span>
+                            <span class="od-meta-val">{{ getPaymentMethodText(order.paymentMethod) }}</span>
+                        </div>
+                        <div class="od-meta-item">
+                            <span class="od-meta-label">应付金额</span>
+                            <span class="od-meta-val price">¥{{ (order.payAmount || 0).toFixed(2) }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="od-body">
+                    <div class="od-main">
+                        <div class="od-card">
+                            <div class="od-card-title">商品信息</div>
+                            <div v-for="item in order.items" :key="item.id" class="od-product-item">
+                                <img :src="item.image || '/static/image/empty.png'" :alt="item.productName" class="od-product-img">
+                                <div class="od-product-body">
+                                    <div class="od-product-name">{{ item.productName }}</div>
+                                    <div class="od-product-sku" v-if="item.skuName">{{ item.skuName }}</div>
+                                    <div class="od-product-price-row">
+                                        <span class="od-unit-price">¥{{ (item.price || 0).toFixed(2) }}</span>
+                                        <span class="od-qty-badge">x{{ item.quantity }}</span>
+                                        <span class="od-subtotal">¥{{ (item.price * item.quantity || 0).toFixed(2) }}</span>
+                                    </div>
+                                    <div v-if="item.isReviewed" class="od-review-box">
+                                        <el-rate :value="item.reviewRating" disabled show-score text-color="#ff9900"></el-rate>
+                                        <div v-if="item.reviewContent" class="od-review-text">{{ item.reviewContent }}</div>
+                                        <div class="od-review-time">{{ item.reviewTime }}</div>
+                                    </div>
+                                    <div v-else-if="order.status === 'completed'" style="margin-top:10px">
+                                        <button class="od-btn od-btn-ghost" style="padding:6px 16px;font-size:13px" @click="showReviewDialog(item)">评价商品</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div v-if="order.logisticsInfo && ['shipped','delivered','completed'].includes(order.status)" class="od-card">
+                            <div class="od-card-title">物流信息</div>
+                            <div v-if="order.shippingCompany" class="od-ship-row">
+                                <span class="od-ship-label">物流公司</span>
+                                <span class="od-ship-val">{{ order.shippingCompany }}</span>
+                            </div>
+                            <div v-if="order.trackingNumber" class="od-ship-row">
+                                <span class="od-ship-label">物流单号</span>
+                                <span class="od-ship-val">{{ order.trackingNumber }}</span>
+                            </div>
+                            <div v-if="order.shippingTime" class="od-ship-row">
+                                <span class="od-ship-label">发货时间</span>
+                                <span class="od-ship-val">{{ order.shippingTime }}</span>
+                            </div>
+                            <div class="od-ship-row">
+                                <span class="od-ship-label">物流跟踪</span>
+                                <span class="od-ship-val">{{ order.logisticsInfo }}</span>
+                            </div>
+                        </div>
+                        <div class="od-card">
+                            <div class="od-actions">
+                                <button class="od-btn od-btn-ghost" @click="goBack">返回订单</button>
+                                <button v-if="order.status === 'pending'" class="od-btn od-btn-primary" @click="payOrder">立即付款</button>
+                                <button v-if="order.status === 'shipped'" class="od-btn od-btn-success" @click="confirmReceive">确认收货</button>
+                                <button v-if="canCancelOrder()" class="od-btn od-btn-danger" @click="cancelOrder">取消订单</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="od-sidebar">
+                        <div class="od-card">
+                            <div class="od-card-title">收货地址</div>
+                            <div v-if="order.address">
+                                <div class="od-addr-name">{{ order.address.name }}</div>
+                                <div class="od-addr-phone">{{ order.address.phone }}</div>
+                                <div class="od-addr-text">{{ order.address.address }}</div>
+                            </div>
+                            <div v-else class="od-addr-text">暂无收货地址信息</div>
+                        </div>
+                        <div class="od-card">
+                            <div class="od-card-title">费用明细</div>
+                            <div class="od-summary-row">
+                                <span>商品总价</span>
+                                <span>¥{{ (order.payAmount || 0).toFixed(2) }}</span>
+                            </div>
+                            <div class="od-summary-row grand">
+                                <span>应付总额</span>
+                                <span class="val">¥{{ (order.payAmount || 0).toFixed(2) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 评价对话框 -->
+        <el-dialog title="评价商品" :visible.sync="reviewDialogVisible" width="500px" @close="resetReviewForm">
+            <div v-if="currentReviewItem">
+                <div class="review-product-box">
+                    <img :src="currentReviewItem.image || '/static/image/empty.png'" :alt="currentReviewItem.productName">
+                    <div>
+                        <div class="review-product-pname">{{ currentReviewItem.productName }}</div>
+                        <div class="review-product-sku" v-if="currentReviewItem.skuName">{{ currentReviewItem.skuName }}</div>
+                    </div>
+                </div>
+                <div class="rform-section">
+                    <span class="rform-label">评分</span>
+                    <el-rate v-model="reviewForm.rating" show-score text-color="#ff9900" score-template="{value} 分"></el-rate>
+                </div>
+                <div class="rform-section">
+                    <span class="rform-label">评价内容</span>
+                    <el-input v-model="reviewForm.content" type="textarea" :rows="4" placeholder="请分享您的使用体验..." maxlength="500" show-word-limit></el-input>
+                </div>
+            </div>
+            <div slot="footer">
+                <el-button @click="reviewDialogVisible = false">取消</el-button>
+                <el-button type="primary" @click="submitReview" :loading="reviewSubmitting">提交评价</el-button>
+            </div>
+        </el-dialog>
+    </front-layout>
+</div>
+
+
+</div>
+
+<script src="https://unpkg.com/vue@2/dist/vue.js"></script>
+<script src="https://unpkg.com/element-ui/lib/index.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data() {
+        return {
+            userInfo: {},
+            order: null,
+            loading: true,
+            error: null,
+            orderId: null,
+            reviewDialogVisible: false,
+            currentReviewItem: null,
+            reviewSubmitting: false,
+            reviewForm: { rating: 5, content: '' }
+        }
+    },
+    mounted() {
+        this.checkAuth();
+        this.getOrderId();
+        this.loadOrderDetail();
+    },
+    methods: {
+        checkAuth() {
+            const userInfo = localStorage.getItem('userInfo');
+            if (userInfo) { this.userInfo = JSON.parse(userInfo); }
+            else { this.$message.warning('请先登录'); window.location.href = '/login'; }
+        },
+        getOrderId() {
+            const urlParams = new URLSearchParams(window.location.search);
+            this.orderId = urlParams.get('id');
+            if (!this.orderId) { this.error = '订单ID不能为空'; this.loading = false; }
+        },
+        async loadOrderDetail() {
+            if (!this.orderId) return;
+            this.loading = true; this.error = null;
+            try {
+                const response = await fetch(`/api/mall/order/${this.orderId}`);
+                const result = await response.json();
+                if (result.code === 200) { this.order = result.data; }
+                else { this.error = result.message; }
+            } catch(e) { this.error = '加载订单详情失败'; }
+            finally { this.loading = false; }
+        },
+        getStatusText(status) {
+            const m = { pending:'待付款', paid:'已付款', shipped:'已发货', delivered:'已收货', completed:'已完成', cancelled:'已取消', cancel_requested:'取消申请中' };
+            return m[status] || status;
+        },
+        canCancelOrder() { return ['pending','paid'].includes(this.order.status); },
+        canDeleteOrder() { return ['cancelled', 'completed', 'cancel_requested'].includes(this.order.status); },
+        getPaymentMethodText(method) {
+            const m = { alipay:'支付宝', wechat:'微信支付', bank:'银行卡' };
+            return m[method] || method;
+        },
+        async payOrder() {
+            try {
+                await this.$confirm('确定要支付这个订单吗？', '提示', { confirmButtonText:'确定', cancelButtonText:'取消', type:'warning' });
+                const res = await fetch(`/api/mall/order/${this.orderId}/pay`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ paymentMethod: this.order.paymentMethod }) });
+                const r = await res.json();
+                if (r.code === 200) { this.$message.success('支付成功'); this.loadOrderDetail(); }
+                else { this.$message.error(r.message); }
+            } catch(e) { if (e !== 'cancel') this.$message.error('支付订单失败'); }
+        },
+        async confirmReceive() {
+            try {
+                await this.$confirm('确定要确认收货吗？', '提示', { confirmButtonText:'确定', cancelButtonText:'取消', type:'warning' });
+                const res = await fetch(`/api/mall/order/${this.orderId}/receive`, { method:'PUT' });
+                const r = await res.json();
+                if (r.code === 200) { this.$message.success('确认收货成功'); this.loadOrderDetail(); }
+                else { this.$message.error(r.message); }
+            } catch(e) { if (e !== 'cancel') this.$message.error('确认收货失败'); }
+        },
+        async cancelOrder() {
+            try {
+                await this.$confirm('确定要提交取消申请吗？', '提示', { confirmButtonText:'确定', cancelButtonText:'取消', type:'warning' });
+                const res = await fetch(`/api/mall/order/${this.orderId}/cancel`, { method:'PUT' });
+                const r = await res.json();
+                if (r.code === 200) { this.$message.success('取消申请已提交，请等待审核'); this.loadOrderDetail(); }
+                else { this.$message.error(r.message); }
+            } catch(e) { if (e !== 'cancel') this.$message.error('提交取消申请失败'); }
+        },
+        showReviewDialog(item) {
+            this.currentReviewItem = item;
+            this.reviewForm = { rating: 5, content: '' };
+            this.reviewDialogVisible = true;
+        },
+        resetReviewForm() {
+            this.currentReviewItem = null;
+            this.reviewForm = { rating: 5, content: '' };
+        },
+        async deleteOrder() {
+            try {
+                await this.$confirm('确定要删除这个订单吗？删除后无法恢复！', '警告', {
+                    confirmButtonText: '确定删除',
+                    cancelButtonText: '取消',
+                    type: 'warning'
+                });
+                const res = await fetch(`/api/mall/order/${this.orderId}`, { method: 'DELETE' });
+                const r = await res.json();
+                if (r.code === 200) {
+                    this.$message.success('订单删除成功');
+                    this.goBack();
+                } else {
+                    this.$message.error(r.message || '删除订单失败');
+                }
+            } catch (e) {
+                if (e !== 'cancel') {
+                    this.$message.error('删除订单失败');
+                }
+            }
+        },
+        async submitReview() {
+            if (!this.reviewForm.rating) { this.$message.error('请选择评分'); return; }
+            try {
+                this.reviewSubmitting = true;
+                const res = await fetch(`/api/mall/order/${this.orderId}/review`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ itemId: this.currentReviewItem.id, rating: this.reviewForm.rating, content: this.reviewForm.content })
+                });
+                const r = await res.json();
+                if (r.code === 200) { this.$message.success('评价提交成功'); this.reviewDialogVisible = false; await this.loadOrderDetail(); }
+                else { this.$message.error(r.message || '评价提交失败'); }
+            } catch(e) { this.$message.error('评价提交失败，请稍后重试'); }
+            finally { this.reviewSubmitting = false; }
+        },
+        goBack() { window.location.href = '/front/mall/orders.html'; }
+    }
+});
+</script>
+</body>
+</html>

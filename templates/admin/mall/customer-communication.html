@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客户沟通管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .page-container { padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #e6e6e6; }
+        .page-header h2 { margin: 0; color: #333; font-size: 24px; font-weight: 600; }
+        .search-card { margin-bottom: 20px; }
+        .table-card { margin-bottom: 20px; }
+        .pagination-container { margin-top: 20px; text-align: center; }
+        .important-tag { background: #f56c6c; color: white; padding: 2px 6px; border-radius: 4px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <admin-layout :active-menu="activeMenu">
+            <template #content>
+                <div class="page-container">
+                    <div class="page-header">
+                        <h2>客户沟通管理</h2>
+                        <el-button type="primary" @click="showCreateDialog">
+                            <i class="el-icon-plus"></i> 新增沟通记录
+                        </el-button>
+                    </div>
+
+                    <el-card class="search-card">
+                        <el-form :inline="true" :model="searchForm">
+                            <el-form-item label="关键词">
+                                <el-input v-model="searchForm.keyword" placeholder="客户名称/沟通主题" clearable></el-input>
+                            </el-form-item>
+                            <el-form-item label="状态">
+                                <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+                                    <el-option label="待跟进" value="pending"></el-option>
+                                    <el-option label="已完成" value="completed"></el-option>
+                                    <el-option label="已取消" value="cancelled"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="沟通方式">
+                                <el-select v-model="searchForm.communicationType" placeholder="请选择" clearable>
+                                    <el-option label="电话" value="phone"></el-option>
+                                    <el-option label="邮件" value="email"></el-option>
+                                    <el-option label="微信" value="wechat"></el-option>
+                                    <el-option label="QQ" value="qq"></el-option>
+                                    <el-option label="其他" value="other"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item>
+                                <el-button type="primary" @click="handleSearch">搜索</el-button>
+                                <el-button @click="handleReset">重置</el-button>
+                            </el-form-item>
+                        </el-form>
+                    </el-card>
+
+                    <el-card class="table-card">
+                        <el-table :data="tableData" v-loading="loading" stripe>
+                            <el-table-column prop="id" label="ID" width="80" align="center"></el-table-column>
+                            <el-table-column prop="customerName" label="客户" width="120"></el-table-column>
+                            <el-table-column prop="communicationTitle" label="沟通主题" min-width="200" show-overflow-tooltip>
+                                <template slot-scope="scope">
+                                    <span v-if="scope.row.isImportant" class="important-tag">重要</span>
+                                    {{ scope.row.communicationTitle }}
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="communicationType" label="沟通方式" width="100" align="center">
+                                <template slot-scope="scope">{{ getTypeText(scope.row.communicationType) }}</template>
+                            </el-table-column>
+                            <el-table-column prop="communicationPurpose" label="沟通目的" width="120" align="center">
+                                <template slot-scope="scope">{{ getPurposeText(scope.row.communicationPurpose) }}</template>
+                            </el-table-column>
+                            <el-table-column prop="status" label="状态" width="100" align="center">
+                                <template slot-scope="scope">
+                                    <el-tag :type="getStatusType(scope.row.status)" size="small">
+                                        {{ getStatusText(scope.row.status) }}
+                                    </el-tag>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="nextFollowUpTime" label="下次跟进" width="160" align="center"></el-table-column>
+                            <el-table-column label="操作" width="300" align="center" fixed="right">
+                                <template slot-scope="scope">
+                                    <el-button size="mini" type="text" @click="handleView(scope.row)">查看</el-button>
+                                    <el-button size="mini" type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+                                    <el-button size="mini" type="success" v-if="scope.row.status === 'pending'" @click="handleComplete(scope.row)">完成</el-button>
+                                    <el-button size="mini" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+                                </template>
+                            </el-table-column>
+                        </el-table>
+
+                        <div class="pagination-container">
+                            <el-pagination
+                                @size-change="handleSizeChange"
+                                @current-change="handleCurrentChange"
+                                :current-page="pagination.pageNum"
+                                :page-sizes="[10, 20, 50, 100]"
+                                :page-size="pagination.pageSize"
+                                layout="total, sizes, prev, pager, next, jumper"
+                                :total="pagination.total">
+                            </el-pagination>
+                        </div>
+                    </el-card>
+
+                    <!-- 新增/编辑对话框 -->
+                    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="60%" :close-on-click-modal="false">
+                        <el-form :model="formData" :rules="formRules" ref="formRef" label-width="120px">
+                            <el-form-item label="客户" prop="userId">
+                                <el-select v-model="formData.userId" placeholder="请选择客户" filterable @change="handleCustomerChange" style="width: 100%">
+                                    <el-option v-for="customer in customerList" :key="customer.id" :label="customer.username + ' (' + customer.phone + ')'" :value="customer.id"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="沟通方式" prop="communicationType">
+                                <el-select v-model="formData.communicationType" placeholder="请选择">
+                                    <el-option label="电话" value="phone"></el-option>
+                                    <el-option label="邮件" value="email"></el-option>
+                                    <el-option label="微信" value="wechat"></el-option>
+                                    <el-option label="QQ" value="qq"></el-option>
+                                    <el-option label="其他" value="other"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="沟通目的" prop="communicationPurpose">
+                                <el-select v-model="formData.communicationPurpose" placeholder="请选择">
+                                    <el-option label="新品推荐" value="new_product"></el-option>
+                                    <el-option label="促销活动" value="promotion"></el-option>
+                                    <el-option label="节日推荐" value="holiday"></el-option>
+                                    <el-option label="反馈收集" value="feedback"></el-option>
+                                    <el-option label="咨询解答" value="consultation"></el-option>
+                                    <el-option label="跟进回访" value="follow_up"></el-option>
+                                    <el-option label="其他" value="other"></el-option>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="沟通主题" prop="communicationTitle">
+                                <el-input v-model="formData.communicationTitle" placeholder="请输入沟通主题" maxlength="200" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item label="沟通内容" prop="communicationContent">
+                                <el-input v-model="formData.communicationContent" type="textarea" :rows="4" placeholder="请输入沟通内容" maxlength="1000" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item label="客户反馈">
+                                <el-input v-model="formData.customerFeedback" type="textarea" :rows="3" placeholder="请输入客户反馈" maxlength="500" show-word-limit></el-input>
+                            </el-form-item>
+                            <el-form-item label="下次跟进时间">
+                                <el-date-picker v-model="formData.nextFollowUpTime" type="datetime" placeholder="选择日期时间" value-format="yyyy-MM-dd HH:mm:ss" style="width: 100%"></el-date-picker>
+                            </el-form-item>
+                            <el-form-item label="状态">
+                                <el-radio-group v-model="formData.status">
+                                    <el-radio label="pending">待跟进</el-radio>
+                                    <el-radio label="completed">已完成</el-radio>
+                                    <el-radio label="cancelled">已取消</el-radio>
+                                </el-radio-group>
+                            </el-form-item>
+                            <el-form-item label="重要标记">
+                                <el-switch v-model="formData.isImportant" :active-value="1" :inactive-value="0"></el-switch>
+                            </el-form-item>
+                        </el-form>
+                        <div slot="footer">
+                            <el-button @click="dialogVisible = false">取消</el-button>
+                            <el-button type="primary" @click="handleSubmit" :loading="submitLoading">确定</el-button>
+                        </div>
+                    </el-dialog>
+
+                    <!-- 查看详情对话框 -->
+                    <el-dialog title="沟通记录详情" :visible.sync="viewDialogVisible" width="60%">
+                        <el-descriptions :column="2" border v-if="viewData">
+                            <el-descriptions-item label="客户">{{ viewData.customerName }}</el-descriptions-item>
+                            <el-descriptions-item label="客户电话">{{ viewData.customerPhone }}</el-descriptions-item>
+                            <el-descriptions-item label="沟通方式">{{ getTypeText(viewData.communicationType) }}</el-descriptions-item>
+                            <el-descriptions-item label="沟通目的">{{ getPurposeText(viewData.communicationPurpose) }}</el-descriptions-item>
+                            <el-descriptions-item label="沟通主题" :span="2">{{ viewData.communicationTitle }}</el-descriptions-item>
+                            <el-descriptions-item label="沟通内容" :span="2">{{ viewData.communicationContent }}</el-descriptions-item>
+                            <el-descriptions-item label="客户反馈" :span="2">{{ viewData.customerFeedback || '暂无' }}</el-descriptions-item>
+                            <el-descriptions-item label="状态">
+                                <el-tag :type="getStatusType(viewData.status)" size="small">{{ getStatusText(viewData.status) }}</el-tag>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="重要标记">
+                                <el-tag v-if="viewData.isImportant" type="danger" size="small">重要</el-tag>
+                                <span v-else>否</span>
+                            </el-descriptions-item>
+                            <el-descriptions-item label="下次跟进时间" :span="2">{{ viewData.nextFollowUpTime || '暂无' }}</el-descriptions-item>
+                            <el-descriptions-item label="创建时间">{{ viewData.createTime }}</el-descriptions-item>
+                            <el-descriptions-item label="更新时间">{{ viewData.updateTime }}</el-descriptions-item>
+                            <el-descriptions-item label="销售人员" :span="2">{{ viewData.salesName }}</el-descriptions-item>
+                        </el-descriptions>
+                        
+                        <!-- 客户购买历史 -->
+                        <div style="margin-top: 20px;" v-if="purchaseHistory.length > 0">
+                            <h4>客户购买历史（最近10条）</h4>
+                            <el-table :data="purchaseHistory" border size="small">
+                                <el-table-column prop="orderNo" label="订单号" width="180"></el-table-column>
+                                <el-table-column prop="productName" label="商品名称"></el-table-column>
+                                <el-table-column prop="quantity" label="数量" width="80"></el-table-column>
+                                <el-table-column prop="price" label="单价" width="100">
+                                    <template slot-scope="scope">¥{{ scope.row.price }}</template>
+                                </el-table-column>
+                                <el-table-column prop="createTime" label="购买时间" width="160"></el-table-column>
+                            </el-table>
+                        </div>
+                    </el-dialog>
+                </div>
+            </template>
+        </admin-layout>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script src="/static/js/components/layout.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    activeMenu: 'customer-communication',
+                    loading: false,
+                    submitLoading: false,
+                    dialogVisible: false,
+                    viewDialogVisible: false,
+                    dialogTitle: '新增沟通记录',
+                    isEdit: false,
+                    tableData: [],
+                    customerList: [],
+                    purchaseHistory: [],
+                    searchForm: {
+                        keyword: '',
+                        status: '',
+                        communicationType: ''
+                    },
+                    pagination: {
+                        pageNum: 1,
+                        pageSize: 10,
+                        total: 0
+                    },
+                    formData: {
+                        id: null,
+                        userId: '',
+                        communicationType: '',
+                        communicationTitle: '',
+                        communicationContent: '',
+                        communicationPurpose: '',
+                        customerFeedback: '',
+                        nextFollowUpTime: '',
+                        status: 'pending',
+                        isImportant: 0
+                    },
+                    viewData: null,
+                    formRules: {
+                        userId: [{ required: true, message: '请选择客户', trigger: 'change' }],
+                        communicationType: [{ required: true, message: '请选择沟通方式', trigger: 'change' }],
+                        communicationTitle: [{ required: true, message: '请输入沟通主题', trigger: 'blur' }],
+                        communicationContent: [{ required: true, message: '请输入沟通内容', trigger: 'blur' }],
+                        communicationPurpose: [{ required: true, message: '请选择沟通目的', trigger: 'change' }]
+                    }
+                }
+            },
+            mounted() {
+                this.loadData();
+                this.loadCustomerList();
+            },
+            methods: {
+                loadData() {
+                    this.loading = true;
+                    const params = {
+                        pageNum: this.pagination.pageNum,
+                        pageSize: this.pagination.pageSize,
+                        keyword: this.searchForm.keyword,
+                        status: this.searchForm.status,
+                        communicationType: this.searchForm.communicationType
+                    };
+                    
+                    axios.get('/api/mall/communication/admin/list', { params })
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.tableData = response.data.data.rows;
+                                this.pagination.total = response.data.data.total;
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载数据失败:', error);
+                            this.$message.error('加载数据失败');
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                        });
+                },
+
+                loadCustomerList() {
+                    axios.get('/api/mall/communication/admin/customers')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.customerList = response.data.data;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载客户列表失败:', error);
+                        });
+                },
+
+                handleSearch() {
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                handleReset() {
+                    this.searchForm = {
+                        keyword: '',
+                        status: '',
+                        communicationType: ''
+                    };
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                handleSizeChange(val) {
+                    this.pagination.pageSize = val;
+                    this.pagination.pageNum = 1;
+                    this.loadData();
+                },
+
+                handleCurrentChange(val) {
+                    this.pagination.pageNum = val;
+                    this.loadData();
+                },
+
+                showCreateDialog() {
+                    this.dialogTitle = '新增沟通记录';
+                    this.isEdit = false;
+                    this.formData = {
+                        id: null,
+                        userId: '',
+                        communicationType: '',
+                        communicationTitle: '',
+                        communicationContent: '',
+                        communicationPurpose: '',
+                        customerFeedback: '',
+                        nextFollowUpTime: '',
+                        status: 'pending',
+                        isImportant: 0
+                    };
+                    this.dialogVisible = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.formRef) {
+                            this.$refs.formRef.clearValidate();
+                        }
+                    });
+                },
+
+                handleEdit(row) {
+                    this.dialogTitle = '编辑沟通记录';
+                    this.isEdit = true;
+                    this.formData = {
+                        id: row.id,
+                        userId: row.userId,
+                        communicationType: row.communicationType,
+                        communicationTitle: row.communicationTitle,
+                        communicationContent: row.communicationContent,
+                        communicationPurpose: row.communicationPurpose,
+                        customerFeedback: row.customerFeedback,
+                        nextFollowUpTime: row.nextFollowUpTime,
+                        status: row.status,
+                        isImportant: row.isImportant
+                    };
+                    this.dialogVisible = true;
+                    this.$nextTick(() => {
+                        if (this.$refs.formRef) {
+                            this.$refs.formRef.clearValidate();
+                        }
+                    });
+                },
+
+                handleView(row) {
+                    axios.get('/api/mall/communication/admin/' + row.id)
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.viewData = response.data.data;
+                                this.viewDialogVisible = true;
+                                
+                                // 加载客户购买历史
+                                this.loadPurchaseHistory(row.userId);
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载详情失败:', error);
+                            this.$message.error('加载详情失败');
+                        });
+                },
+
+                loadPurchaseHistory(userId) {
+                    axios.get('/api/mall/communication/admin/customer/' + userId + '/purchase-history')
+                        .then(response => {
+                            if (response.data.code === 200) {
+                                this.purchaseHistory = response.data.data;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('加载购买历史失败:', error);
+                        });
+                },
+
+                handleCustomerChange(userId) {
+                    // 客户选择变化时可以加载客户信息
+                    console.log('选择客户:', userId);
+                },
+
+                handleSubmit() {
+                    this.$refs.formRef.validate((valid) => {
+                        if (valid) {
+                            this.submitLoading = true;
+                            const url = this.isEdit ? '/api/mall/communication/admin/update' : '/api/mall/communication/admin/create';
+                            
+                            axios.post(url, this.formData)
+                                .then(response => {
+                                    if (response.data.code === 200) {
+                                        this.$message.success(response.data.message);
+                                        this.dialogVisible = false;
+                                        this.loadData();
+                                    } else {
+                                        this.$message.error(response.data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('提交失败:', error);
+                                    this.$message.error('提交失败');
+                                })
+                                .finally(() => {
+                                    this.submitLoading = false;
+                                });
+                        }
+                    });
+                },
+
+                handleComplete(row) {
+                    this.$confirm('确定要将此沟通记录标记为已完成吗？', '提示', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'warning'
+                    }).then(() => {
+                        axios.post('/api/mall/communication/admin/update-status', {
+                            id: row.id,
+                            status: 'completed'
+                        }).then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        }).catch(error => {
+                            console.error('操作失败:', error);
+                            this.$message.error('操作失败');
+                        });
+                    });
+                },
+
+                handleDelete(row) {
+                    this.$confirm('确定要删除该沟通记录吗？删除后不可恢复！', '警告', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '取消',
+                        type: 'error'
+                    }).then(() => {
+                        axios.get('/api/mall/communication/admin/delete', {
+                            params: { id: row.id }
+                        }).then(response => {
+                            if (response.data.code === 200) {
+                                this.$message.success(response.data.message);
+                                this.loadData();
+                            } else {
+                                this.$message.error(response.data.message);
+                            }
+                        }).catch(error => {
+                            console.error('删除失败:', error);
+                            this.$message.error('删除失败');
+                        });
+                    });
+                },
+
+                getTypeText(type) {
+                    const map = {
+                        'phone': '电话',
+                        'email': '邮件',
+                        'wechat': '微信',
+                        'qq': 'QQ',
+                        'other': '其他'
+                    };
+                    return map[type] || type;
+                },
+
+                getPurposeText(purpose) {
+                    const map = {
+                        'new_product': '新品推荐',
+                        'promotion': '促销活动',
+                        'holiday': '节日推荐',
+                        'feedback': '反馈收集',
+                        'consultation': '咨询解答',
+                        'follow_up': '跟进回访',
+                        'other': '其他'
+                    };
+                    return map[purpose] || purpose;
+                },
+
+                getStatusText(status) {
+                    const map = {
+                        'pending': '待跟进',
+                        'completed': '已完成',
+                        'cancelled': '已取消'
+                    };
+                    return map[status] || status;
+                },
+
+                getStatusType(status) {
+                    const map = {
+                        'pending': 'warning',
+                        'completed': 'success',
+                        'cancelled': 'info'
+                    };
+                    return map[status] || '';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

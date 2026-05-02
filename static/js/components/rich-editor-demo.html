@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>富文本编辑器组件示例</title>
+    <!-- Quill.js 富文本编辑器 -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <!-- 富文本编辑器组件样式 -->
+    <link rel="stylesheet" href="/static/css/rich-editor.css">
+    <!-- 富文本编辑器组件 -->
+    <script src="/static/js/components/rich-editor.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #409eff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .demo-section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 1px solid #e4e7ed;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+        .demo-section h2 {
+            margin-top: 0;
+            color: #303133;
+            font-size: 18px;
+            border-bottom: 2px solid #409eff;
+            padding-bottom: 10px;
+        }
+        .demo-section h3 {
+            color: #606266;
+            font-size: 16px;
+            margin: 20px 0 10px 0;
+        }
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .button-group {
+            margin: 20px 0;
+        }
+        .btn {
+            background: #409eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #337ecc;
+        }
+        .btn-secondary {
+            background: #909399;
+        }
+        .btn-secondary:hover {
+            background: #73767a;
+        }
+        .btn-danger {
+            background: #f56c6c;
+        }
+        .btn-danger:hover {
+            background: #f23434;
+        }
+        .output {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #e4e7ed;
+        }
+        .feature-list li:before {
+            content: "✓";
+            color: #67c23a;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>富文本编辑器组件示例</h1>
+            <p>可复用的富文本编辑器组件，基于 Quill.js 构建</p>
+        </div>
+        
+        <div class="content">
+            <!-- 基本使用示例 -->
+            <div class="demo-section">
+                <h2>基本使用示例</h2>
+                <p>最简单的富文本编辑器使用方式：</p>
+                
+                <div class="code-block">
+// 基本使用
+const editor = new RichEditor({
+    container: '#editor1',
+    placeholder: '请输入内容...',
+    height: 200
+});
+                </div>
+                
+                <div id="editor1" style="height: 200px; margin: 20px 0;"></div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="getContent1()">获取内容</button>
+                    <button class="btn btn-secondary" onclick="setContent1()">设置内容</button>
+                    <button class="btn btn-danger" onclick="clearContent1()">清空内容</button>
+                </div>
+                
+                <div id="output1" class="output" style="display: none;"></div>
+            </div>
+
+            <!-- 高级配置示例 -->
+            <div class="demo-section">
+                <h2>高级配置示例</h2>
+                <p>自定义工具栏和事件处理：</p>
+                
+                <div class="code-block">
+// 高级配置
+const editor = new RichEditor({
+    container: '#editor2',
+    placeholder: '请输入内容...',
+    height: 300,
+    toolbar: [
+        ['bold', 'italic', 'underline'],
+        ['link', 'image'],
+        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+        ['blockquote', 'code-block'],
+        [{ 'header': [1, 2, 3, false] }],
+        [{ 'color': [] }, { 'background': [] }],
+        [{ 'align': [] }],
+        ['clean']
+    ],
+    onChange: function(content) {
+        console.log('内容变化:', content);
+    },
+    onReady: function(editor) {
+        console.log('编辑器就绪');
+    }
+});
+                </div>
+                
+                <div id="editor2" style="height: 300px; margin: 20px 0;"></div>
+                
+                <div class="button-group">
+                    <button class="btn" onclick="getContent2()">获取HTML</button>
+                    <button class="btn" onclick="getText2()">获取纯文本</button>
+                    <button class="btn" onclick="insertText2()">插入文本</button>
+                    <button class="btn" onclick="insertHTML2()">插入HTML</button>
+                </div>
+                
+                <div id="output2" class="output" style="display: none;"></div>
+            </div>
+
+            <!-- 只读模式示例 -->
+            <div class="demo-section">
+                <h2>只读模式示例</h2>
+                <p>只读模式的富文本编辑器：</p>
+                
+                <div class="code-block">
+// 只读模式
+const editor = new RichEditor({
+    container: '#editor3',
+    placeholder: '只读内容...',
+    height: 200,
+    readonly: true,
+    value: '&lt;p&gt;这是只读内容，用户无法编辑。&lt;/p&gt;'
+});
+                </div>
+                
+                <div id="editor3" style="height: 200px; margin: 20px 0;"></div>
+            </div>
+
+            <!-- 功能特性 -->
+            <div class="demo-section">
+                <h2>功能特性</h2>
+                <ul class="feature-list">
+                    <li>基于 Quill.js 构建，功能强大</li>
+                    <li>支持多种文本格式（粗体、斜体、下划线等）</li>
+                    <li>支持链接和图片插入</li>
+                    <li>支持列表（有序、无序）</li>
+                    <li>支持代码块和引用</li>
+                    <li>支持标题格式</li>
+                    <li>支持文字颜色和背景色</li>
+                    <li>支持文本对齐</li>
+                    <li>支持只读模式</li>
+                    <li>支持内容变化监听</li>
+                    <li>支持多种内容格式获取（HTML、纯文本、Delta）</li>
+                    <li>支持程序化内容操作</li>
+                    <li>响应式设计，支持移动端</li>
+                    <li>支持暗色主题</li>
+                </ul>
+            </div>
+
+            <!-- API 文档 -->
+            <div class="demo-section">
+                <h2>API 文档</h2>
+                
+                <h3>构造函数参数</h3>
+                <div class="code-block">
+new RichEditor({
+    container: '#editor',           // 容器选择器
+    placeholder: '请输入内容...',    // 占位符文本
+    height: 300,                    // 编辑器高度
+    toolbar: [...],                 // 工具栏配置
+    onChange: function(content) {}, // 内容变化回调
+    onReady: function(editor) {},   // 编辑器就绪回调
+    value: '',                      // 初始内容
+    readonly: false                 // 是否只读
+});
+                </div>
+
+                <h3>主要方法</h3>
+                <div class="code-block">
+// 获取内容
+editor.getContent('html');    // 获取HTML格式
+editor.getContent('text');    // 获取纯文本
+editor.getContent('delta');   // 获取Delta格式
+
+// 设置内容
+editor.setContent(content, 'html');
+
+// 清空内容
+editor.clear();
+
+// 插入文本
+editor.insertText('文本', { bold: true });
+
+// 插入HTML
+editor.insertHTML('&lt;p&gt;HTML内容&lt;/p&gt;');
+
+// 格式化选中文本
+editor.format('bold', true);
+
+// 获取选中文本格式
+editor.getFormat();
+
+// 设置只读模式
+editor.setReadOnly(true);
+
+// 聚焦/失焦
+editor.focus();
+editor.blur();
+
+// 获取编辑器实例
+editor.getEditor();
+
+// 销毁编辑器
+editor.destroy();
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let editor1, editor2, editor3;
+
+        // 初始化编辑器
+        document.addEventListener('DOMContentLoaded', function() {
+            // 基本编辑器
+            editor1 = new RichEditor({
+                container: '#editor1',
+                placeholder: '请输入内容...',
+                height: 200
+            });
+
+            // 高级配置编辑器
+            editor2 = new RichEditor({
+                container: '#editor2',
+                placeholder: '请输入内容...',
+                height: 300,
+                toolbar: [
+                    ['bold', 'italic', 'underline'],
+                    ['link', 'image'],
+                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                    ['blockquote', 'code-block'],
+                    [{ 'header': [1, 2, 3, false] }],
+                    [{ 'color': [] }, { 'background': [] }],
+                    [{ 'align': [] }],
+                    ['clean']
+                ],
+                onChange: function(content) {
+                    console.log('内容变化:', content);
+                },
+                onReady: function(editor) {
+                    console.log('编辑器2就绪');
+                }
+            });
+
+            // 只读编辑器
+            editor3 = new RichEditor({
+                container: '#editor3',
+                placeholder: '只读内容...',
+                height: 200,
+                readonly: true,
+                value: '<p>这是只读内容，用户无法编辑。</p><p>可以显示富文本格式，但无法修改。</p>'
+            });
+        });
+
+        // 编辑器1的方法
+        function getContent1() {
+            const content = editor1.getContent();
+            showOutput('output1', 'HTML内容:\n' + content);
+        }
+
+        function setContent1() {
+            editor1.setContent('<p>这是通过程序设置的内容！</p>');
+        }
+
+        function clearContent1() {
+            editor1.clear();
+        }
+
+        // 编辑器2的方法
+        function getContent2() {
+            const content = editor2.getContent('html');
+            showOutput('output2', 'HTML内容:\n' + content);
+        }
+
+        function getText2() {
+            const text = editor2.getContent('text');
+            showOutput('output2', '纯文本内容:\n' + text);
+        }
+
+        function insertText2() {
+            editor2.insertText('插入的文本', { bold: true, color: '#409eff' });
+        }
+
+        function insertHTML2() {
+            editor2.insertHTML('<p style="color: #67c23a;">插入的HTML内容</p>');
+        }
+
+        // 显示输出
+        function showOutput(elementId, content) {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

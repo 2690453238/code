@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户登录 - 社区团购管理系统</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --red-primary: #e8a81a;
+            --red-deep:    #96281b;
+            --red-light:   #e74c3c;
+            --red-soft:    #fdf1f0;
+            --red-border:  #f5c6c2;
+            --gold:        #c9a84c;
+            --text-dark:   #1a0a08;
+            --text-muted:  #7a5c58;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Noto Serif SC', 'PingFang SC', 'Microsoft YaHei', serif;
+            background: url('/static/image/bg.jpg') center center no-repeat;
+            background-size: cover;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg,
+                rgba(96, 20, 12, 0.72) 0%,
+                rgba(160, 40, 24, 0.55) 50%,
+                rgba(20, 6, 4, 0.78) 100%);
+            z-index: 0;
+        }
+
+        .login-wrapper {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            width: 860px;
+            min-height: 520px;
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 24px 80px rgba(96, 20, 12, 0.55),
+                        0 2px 0 rgba(201,168,76,0.35) inset;
+        }
+
+        /* ── 左侧品牌区 ── */
+        .login-brand {
+            flex: 0 0 340px;
+            background: linear-gradient(160deg, var(--red-primary) 0%, var(--red-deep) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 50px 36px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-brand::before {
+            content: '';
+            position: absolute;
+            top: -60px; right: -60px;
+            width: 220px; height: 220px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.06);
+        }
+        .login-brand::after {
+            content: '';
+            position: absolute;
+            bottom: -80px; left: -50px;
+            width: 260px; height: 260px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.04);
+        }
+
+        .brand-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.15);
+            border: 2px solid rgba(201,168,76,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 0 0 8px rgba(255,255,255,0.05);
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-title {
+            color: #fff;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            margin: 0 0 12px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .brand-sub {
+            color: rgba(255,255,255,0.7);
+            font-size: 13px;
+            letter-spacing: 2px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-divider {
+            width: 48px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--gold), transparent);
+            margin: 20px auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-tags {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            position: relative;
+            z-index: 1;
+            margin-top: 10px;
+        }
+
+        .brand-tag {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+        }
+
+        .brand-tag-dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--gold);
+            flex-shrink: 0;
+        }
+
+        /* ── 右侧表单区 ── */
+        .login-form-area {
+            flex: 1;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 50px 48px;
+        }
+
+        .form-header {
+            margin-bottom: 32px;
+        }
+
+        .form-header h3 {
+            margin: 0 0 6px;
+            font-size: 22px;
+            color: var(--text-dark);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        .form-header p {
+            margin: 0;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .form-header-line {
+            width: 36px;
+            height: 3px;
+            background: var(--red-primary);
+            border-radius: 2px;
+            margin-top: 12px;
+        }
+
+        /* Element UI 覆盖 */
+        .login-form-area .el-input__inner {
+            border-color: #e8d5d3;
+            border-radius: 8px;
+            height: 44px;
+            font-size: 14px;
+            color: var(--text-dark);
+            transition: border-color .25s, box-shadow .25s;
+        }
+        .login-form-area .el-input__inner:focus {
+            border-color: var(--red-primary);
+            box-shadow: 0 0 0 3px rgba(192,57,43,0.12);
+        }
+        .login-form-area .el-input__prefix {
+            color: var(--red-primary);
+        }
+        .login-form-area .el-select .el-input__inner:focus {
+            border-color: var(--red-primary);
+        }
+        .login-form-area .el-form-item {
+            margin-bottom: 18px;
+        }
+        .login-form-area .el-form-item__error {
+            color: var(--red-light);
+        }
+
+        .login-btn {
+            width: 100%;
+            height: 46px;
+            font-size: 15px;
+            letter-spacing: 3px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--red-light) 0%, var(--red-primary) 60%, var(--red-deep) 100%);
+            border: none;
+            color: #fff;
+            cursor: pointer;
+            margin-top: 6px;
+            font-family: inherit;
+            transition: opacity .2s, transform .15s, box-shadow .2s;
+            box-shadow: 0 4px 18px rgba(192,57,43,0.38);
+        }
+        .login-btn:hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(192,57,43,0.45);
+        }
+        .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .form-footer {
+            text-align: center;
+            margin-top: 22px;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+        .form-footer a {
+            color: var(--red-primary);
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .form-footer a:hover {
+            color: var(--red-deep);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <!-- 左侧品牌 -->
+        <!-- <div class="login-brand">
+            <div class="brand-icon">&#128344;</div>
+            <h1 class="brand-title">社区团购管理系统</h1>
+            <div class="brand-divider"></div>
+            <p class="brand-sub">用户登录</p>
+            <div class="brand-tags"> 
+            </div>
+        </div> -->
+
+        <!-- 右侧表单 -->
+        <div class="login-form-area">
+            <div class="form-header">
+                <h3>社区团购管理系统 - 欢迎回来</h3>
+                <p>请登录您的账号以继续操作</p>
+                <div class="form-header-line"></div>
+            </div>
+
+            <div id="app">
+                <el-form :model="loginForm" :rules="loginRules" ref="loginForm">
+                    <el-form-item prop="username">
+                        <el-input
+                            v-model="loginForm.username"
+                            placeholder="请输入用户名"
+                            prefix-icon="el-icon-user"
+                            size="medium">
+                        </el-input>
+                    </el-form-item>
+
+                    <el-form-item prop="password">
+                        <el-input
+                            v-model="loginForm.password"
+                            type="password"
+                            placeholder="请输入密码"
+                            prefix-icon="el-icon-lock"
+                            size="medium"
+                            @keyup.enter.native="handleLogin">
+                        </el-input>
+                    </el-form-item>
+
+                    <el-form-item prop="role">
+                        <el-select
+                            v-model="loginForm.role"
+                            placeholder="请选择登录角色"
+                            size="medium"
+                            style="width:100%">
+                            <el-option
+                                v-for="role in roleOptions"
+                                :key="role.value"
+                                :label="role.label"
+                                :value="role.value">
+                                <span style="float:left">{{ role.label }}</span>
+                                <span style="float:right;color:#8492a6;font-size:13px">{{ role.description }}</span>
+                            </el-option>
+                        </el-select>
+                    </el-form-item>
+
+                    <el-form-item>
+                        <button
+                            class="login-btn"
+                            :disabled="loading"
+                            @click.prevent="handleLogin">
+                            {{ loading ? '登录中...' : '登 录' }}
+                        </button>
+                    </el-form-item>
+                </el-form>
+
+                <div class="form-footer">
+                    还没有账号？<a href="/register">立即注册</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/vue.js"></script>
+    <script src="/static/js/element-ui.min.js"></script>
+    <script src="/static/js/axios.min.js"></script>
+    <script src="/static/js/config/layout-config.js"></script>
+    <script>
+        new Vue({
+            el: '#app',
+            data() {
+                return {
+                    loading: false,
+                    roleOptions: [],
+                    loginForm: {
+                        username: '',
+                        password: '',
+                        role: ''
+                    },
+                    loginRules: {
+                        username: [
+                            { required: true, message: '请输入用户名', trigger: 'blur' }
+                        ],
+                        password: [
+                            { required: true, message: '请输入密码', trigger: 'blur' },
+                            { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+                        ],
+                        role: [
+                            { required: true, message: '请选择登录角色', trigger: 'change' }
+                        ]
+                    }
+                }
+            },
+            created() {
+                this.loadRoleOptions();
+            },
+            methods: {
+                loadRoleOptions() {
+                    this.roleOptions = LayoutConfig.utils.getAllRoles();
+                },
+                handleLogin() {
+                    this.$refs.loginForm.validate((valid) => {
+                        if (valid) {
+                            this.loading = true;
+                            axios.post('/api/auth/login', this.loginForm)
+                                .then(response => {
+                                    if (response.data.code === 200) {
+                                        localStorage.setItem('token', 'logged_in');
+                                        localStorage.setItem('userInfo', JSON.stringify(response.data.data.user));
+                                        this.$message.success(response.data.message);
+                                        const userRole = response.data.data.user.role;
+                                        const homePage = LayoutConfig.utils.getRoleHomePage(userRole);
+                                        setTimeout(() => {
+                                            window.location.href = response.data.data.redirect_url || homePage;
+                                        }, 1000);
+                                    } else {
+                                        this.$message.error(response.data.message);
+                                    }
+                                })
+                                .catch(error => {
+                                    console.error('登录失败:', error);
+                                    this.$message.error('登录失败，请稍后重试');
+                                })
+                                .finally(() => {
+                                    this.loading = false;
+                                });
+                        }
+                    });
+                }
+            }
+        });
+    </script>
+</body>
+</html>
