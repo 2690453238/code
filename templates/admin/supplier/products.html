@@ -93,9 +93,13 @@
                             </template>
                         </el-table-column>
                         <el-table-column prop="name" label="商品名称" min-width="180"></el-table-column>
-                        <el-table-column prop="price" label="售价" width="100">
+                        <el-table-column prop="price" label="售价" width="120">
                             <template slot-scope="scope">
-                                <span style="color:#f56c6c;font-weight:bold">¥{{ scope.row.price }}</span>
+                                <span v-if="scope.row.discountRate" style="color:#f56c6c;font-weight:bold">
+                                    ¥{{ (scope.row.price * scope.row.discountRate).toFixed(2) }}
+                                    <el-tag size="mini" type="danger">{{ Math.round(scope.row.discountRate * 100) }}%</el-tag>
+                                </span>
+                                <span v-else style="color:#f56c6c;font-weight:bold">¥{{ scope.row.price }}</span>
                             </template>
                         </el-table-column>
                         <el-table-column prop="costPrice" label="进价" width="100">

@@ -313,21 +313,46 @@ class PurchaseService:
     # ── 取消订单 ──────────────────────────────────────────────
 
     def cancel_order(self, order_id: int, supplier_id: int) -> Dict[str, Any]:
-        """取消采购订单"""
+        """取消采购订单（草稿或已确认状态）"""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cursor:
                     cursor.execute(
-                        "UPDATE py_purchase_order SET status = 'cancelled' WHERE id = %s AND supplierId = %s AND status = 'draft'",
+                        "UPDATE py_purchase_order SET status = 'cancelled' WHERE id = %s AND supplierId = %s AND status IN ('draft', 'confirmed')",
                         (order_id, supplier_id),
                     )
                     if cursor.rowcount == 0:
-                        return error("无法取消该订单（可能不是草稿状态或不存在）")
+                        return error("无法取消该订单（可能不是草稿/已确认状态或不存在）")
                     conn.commit()
                     return success(None, "订单已取消")
         except Exception as e:
             print(f"取消采购订单失败: {e}")
             return error(f"取消采购订单失败: {str(e)}")
+
+    # ── 删除订单 ──────────────────────────────────────────────
+
+    def delete_order(self, order_id: int, supplier_id: int) -> Dict[str, Any]:
+        """删除已支付或已取消的采购订单（含明细）"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT id, status FROM py_purchase_order WHERE id = %s AND supplierId = %s",
+                        (order_id, supplier_id),
+                    )
+                    order = cursor.fetchone()
+                    if not order:
+                        return error("采购订单不存在")
+                    if order["status"] not in ("paid", "cancelled"):
+                        return error("只能删除已支付或已取消的订单")
+
+                    cursor.execute("DELETE FROM py_purchase_order_item WHERE orderId = %s", (order_id,))
+                    cursor.execute("DELETE FROM py_purchase_order WHERE id = %s", (order_id,))
+                    conn.commit()
+                    return success(None, "订单已删除")
+        except Exception as e:
+            print(f"删除采购订单失败: {e}")
+            return error(f"删除采购订单失败: {str(e)}")
 
     # ── 工具方法 ──────────────────────────────────────────────
 

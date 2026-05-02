@@ -603,15 +603,14 @@
                             <div v-for="product in products" :key="product.id" class="product-card">
                                 <div class="product-img-wrap" @click="viewProduct(product.id)">
                                     <img :src="product.mainImage || '/static/image/noimg.jpg'" :alt="product.name">
-                                    <span v-if="product.originalPrice && product.originalPrice > product.price" class="product-badge">
-                                        特价
+                                    <span v-if="product.discountRate" class="product-badge">
+                                        {{ Math.round(product.discountRate * 10) }}折
                                     </span>
                                 </div>
                                 <div class="product-body">
                                     <div class="product-name" @click="viewProduct(product.id)">{{ product.name }}</div>
                                     <div class="price-row">
-                                        <div class="price-now"><span>¥</span>{{ product.price }}</div>
-                                        <div v-if="product.originalPrice" class="price-old">¥{{ product.originalPrice }}</div>
+                                        <div class="price-now"><span>¥</span>{{ product.discountRate ? (product.price * product.discountRate).toFixed(2) : product.price }}</div>
                                     </div>
                                     <div class="card-actions">
                                         <button class="btn-cart" @click="addToCart(product)">

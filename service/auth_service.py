@@ -11,8 +11,8 @@ class AuthService:
     ROLE_HOME_PAGE = {
         'system_admin': '/admin/index.html',
         'platform_operator': '/admin/data-analytics.html',
-        'community_leader': '/admin/mall/mall-products.html',
-        'supplier': '/admin/mall/mall-products.html',
+        'community_leader': '/admin/supplier/products.html',
+        'supplier': '/admin/supplier/products.html',
         'user': '/front/mall/mall.html'
     }
 

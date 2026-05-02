@@ -119,7 +119,6 @@
                                         勾选需要采购的商品，推荐分 &ge; 80 已自动预选
                                     </span>
                                     <el-button type="primary" size="small"
-                                        :disabled="selectedProductIds.length === 0"
                                         :loading="purchasing"
                                         @click="batchPurchase">
                                         一键采购 ({{ selectedProductIds.length }})

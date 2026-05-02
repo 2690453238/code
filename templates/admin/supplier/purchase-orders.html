@@ -126,8 +126,10 @@
                             <el-button v-if="detail.status === 'draft'" type="primary" size="small" @click="confirmOrder">确认订单</el-button>
                             <el-button v-if="detail.status === 'draft'" type="danger" size="small" plain @click="cancelOrder">取消订单</el-button>
                             <el-button v-if="detail.status === 'confirmed'" type="success" size="small" @click="payOrder" :loading="paying">
-                                💰 支付 ¥{{ detail.totalCost }}
+                                💰 支付 ¥{{ detailTotal }}
                             </el-button>
+                            <el-button v-if="detail.status === 'confirmed'" type="danger" size="small" plain @click="cancelOrder">取消订单</el-button>
+                            <el-button v-if="detail.status === 'paid' || detail.status === 'cancelled'" type="danger" size="small" plain @click="deleteOrder">删除订单</el-button>
                             <el-button size="small" @click="detailVisible = false">关闭</el-button>
                         </div>
                     </div>
@@ -157,6 +159,19 @@ new Vue({
         detail: {},
         detailItems: [],
         paying: false,
+    },
+    computed: {
+        detailTotal: function () {
+            var self = this;
+            var total = 0;
+            if (self.detailItems && self.detailItems.length > 0) {
+                for (var i = 0; i < self.detailItems.length; i++) {
+                    var item = self.detailItems[i];
+                    total += (item.costPrice || 0) * (item.quantity || 0);
+                }
+            }
+            return total.toFixed(2);
+        }
     },
     mounted: function () {
         this.loadOrders();
@@ -280,6 +295,28 @@ new Vue({
                     })
                     .finally(function () {
                         self.paying = false;
+                    });
+            }).catch(function () {});
+        },
+        deleteOrder: function () {
+            var self = this;
+            self.$confirm('确定删除该订单？删除后不可恢复。', '删除订单', {
+                confirmButtonText: '确定删除',
+                cancelButtonText: '取消',
+                type: 'warning',
+            }).then(function () {
+                axios.post('/api/supplier/purchase/orders/' + self.detail.id + '/delete')
+                    .then(function (res) {
+                        if (res.data.code === 200) {
+                            self.$message.success('订单已删除');
+                            self.detailVisible = false;
+                            self.loadOrders();
+                        } else {
+                            self.$message.error(res.data.message);
+                        }
+                    })
+                    .catch(function () {
+                        self.$message.error('删除失败');
                     });
             }).catch(function () {});
         },

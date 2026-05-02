@@ -144,7 +144,7 @@ class SupplierService:
                 params = []
 
                 if user_info['role'] not in SupplierService.GLOBAL_ROLES:
-                    conditions.insert(0, "supplierId = %s")
+                    conditions.insert(0, "py_product.supplierId = %s")
                     params.append(user_info['id'])
 
                 if keyword:
@@ -166,11 +166,13 @@ class SupplierService:
 
                 offset = (page_num - 1) * page_size
                 data_sql = f"""
-                    SELECT id, name, price, costPrice, originalPrice, stock, sales, status,
-                           mainImage, categoryId, brand, isHot, isNew, createTime
+                    SELECT py_product.id, py_product.name, py_product.price, py_product.costPrice, py_product.originalPrice, py_product.stock, py_product.sales, py_product.status,
+                           py_product.mainImage, py_product.categoryId, py_product.brand, py_product.isHot, py_product.isNew, py_product.createTime,
+                           sd.discountRate
                     FROM py_product
+                    LEFT JOIN py_supplier_discount sd ON sd.productId = py_product.id AND sd.supplierId = py_product.supplierId
                     WHERE {where_clause}
-                    ORDER BY createTime DESC
+                    ORDER BY py_product.createTime DESC
                     LIMIT %s OFFSET %s
                 """
                 data_params = params + [page_size, offset]

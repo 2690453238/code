@@ -134,6 +134,17 @@
             text-decoration: line-through;
             margin-left: 15px;
         }
+        .discount-tag {
+            display: inline-block;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: #fff;
+            font-size: 13px;
+            padding: 2px 10px;
+            border-radius: 10px;
+            margin-left: 12px;
+            font-weight: normal;
+            vertical-align: middle;
+        }
         .product-stock {
             color: #67c23a;
             margin-bottom: 20px;
@@ -551,8 +562,11 @@
                         <h1 class="product-title">{{ product.name }}</h1>
                         
                         <div class="product-price">
-                            ¥{{ product.price }}
-                            <span v-if="product.originalPrice" class="product-original-price">
+                            ¥{{ product.discountRate ? (product.price * product.discountRate).toFixed(2) : product.price }}
+                            <span v-if="product.discountRate" class="discount-tag">
+                                {{ Math.round(product.discountRate * 10) }}折
+                            </span>
+                            <span v-if="product.discountRate" class="product-original-price">
                                 ¥{{ product.originalPrice }}
                             </span>
                         </div>

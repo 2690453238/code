@@ -73,3 +73,12 @@ def cancel_order(order_id):
     if not supplier_id:
         return jsonify(error("无权访问"))
     return jsonify(service.cancel_order(order_id, supplier_id))
+
+
+@purchase_bp.route("/orders/<int:order_id>/delete", methods=["POST"])
+@login_required
+def delete_order(order_id):
+    supplier_id = _resolve_supplier_id()
+    if not supplier_id:
+        return jsonify(error("无权访问"))
+    return jsonify(service.delete_order(order_id, supplier_id))

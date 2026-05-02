@@ -78,8 +78,8 @@
                             </el-button>
                         </el-col>
                         <el-col :span="6">
-                            <el-button type="success" @click="goToProducts">
-                                商品管理
+                            <el-button type="success" @click="goToCommunityProducts">
+                                社区商品
                             </el-button>
                         </el-col>
                         <el-col :span="6">
@@ -153,8 +153,8 @@
                 goToCategories() {
                     window.location.href = '/admin/mall-categories.html';
                 },
-                goToProducts() {
-                    window.location.href = '/admin/mall-products.html';
+                goToCommunityProducts() {
+                    window.location.href = '/admin/supplier/products.html';
                 },
                 goToOrders() {
                     window.location.href = '/admin/mall-orders.html';

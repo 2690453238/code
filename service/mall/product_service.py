@@ -401,7 +401,9 @@ class ProductService:
             'stock': int(row.get('stock') or 0),
             'sales': int(row.get('sales') or 0),
             'categoryId': int(row['categoryId']) if row.get('categoryId') else None,
-            'categoryName': row.get('categoryName') or '未分类'
+            'categoryName': row.get('categoryName') or '未分类',
+            'hasDiscount': bool(row.get('hasDiscount')),
+            'discountRate': float(row['discountRate']) if row.get('discountRate') is not None else None
         }
 
     def _build_bundle_strategies(

@@ -55,12 +55,15 @@ class ProductModel:
             # 查询数据
             offset = (page - 1) * limit
             data_sql = f"""
-                SELECT p.id, p.name, p.description, p.categoryId, p.supplierId, p.brand, p.mainImage, 
+                SELECT p.id, p.name, p.description, p.categoryId, p.supplierId, p.brand, p.mainImage,
                        p.galleryImages, p.price, p.originalPrice, p.stock, p.sales, p.status,
                        p.isHot, p.isNew, p.createTime, p.updateTime,
-                       c.name as categoryName
+                       c.name as categoryName,
+                       CASE WHEN sd.id IS NOT NULL THEN 1 ELSE 0 END as hasDiscount,
+                       sd.discountRate
                 FROM py_product p
                 LEFT JOIN py_category c ON p.categoryId = c.id
+                LEFT JOIN py_supplier_discount sd ON sd.productId = p.id AND sd.supplierId = p.supplierId
                 WHERE {where_clause}
                 {order_clause}
                 LIMIT %s OFFSET %s
@@ -76,6 +79,8 @@ class ProductModel:
                     row['price'] = float(row['price'])
                 if row.get('originalPrice'):
                     row['originalPrice'] = float(row['originalPrice'])
+                if row.get('discountRate') is not None:
+                    row['discountRate'] = float(row['discountRate'])
                 # 转换datetime类型为字符串，避免JSON序列化错误
                 if row.get('createTime'):
                     row['createTime'] = row['createTime'].strftime('%Y-%m-%d %H:%M:%S') if row['createTime'] else None
@@ -93,12 +98,15 @@ class ProductModel:
         """根据ID获取商品详情"""
         with self.db.cursor() as cursor:
             sql = """
-                SELECT p.id, p.name, p.description, p.categoryId, p.supplierId, p.brand, p.mainImage, 
+                SELECT p.id, p.name, p.description, p.categoryId, p.supplierId, p.brand, p.mainImage,
                        p.galleryImages, p.price, p.originalPrice, p.stock, p.sales, p.status,
                        p.isHot, p.isNew, p.createTime, p.updateTime,
-                       c.name as categoryName
+                       c.name as categoryName,
+                       CASE WHEN sd.id IS NOT NULL THEN 1 ELSE 0 END as hasDiscount,
+                       sd.discountRate
                 FROM py_product p
                 LEFT JOIN py_category c ON p.categoryId = c.id
+                LEFT JOIN py_supplier_discount sd ON sd.productId = p.id AND sd.supplierId = p.supplierId
                 WHERE p.id = %s
             """
             print(f"执行SQL: {sql}, 参数: {product_id}")
@@ -110,6 +118,8 @@ class ProductModel:
                     result['price'] = float(result['price'])
                 if result.get('originalPrice'):
                     result['originalPrice'] = float(result['originalPrice'])
+                if result.get('discountRate') is not None:
+                    result['discountRate'] = float(result['discountRate'])
                 # 转换datetime类型为字符串，避免JSON序列化错误
                 if result.get('createTime'):
                     result['createTime'] = result['createTime'].strftime('%Y-%m-%d %H:%M:%S') if result['createTime'] else None
