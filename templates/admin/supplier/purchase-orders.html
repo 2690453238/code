@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>采购订单管理</title>
+    <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-chalk/index.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .page-wrap { padding: 20px; }
+        .toolbar { margin-bottom: 16px; }
+        .order-status { font-size: 12px; }
+        .order-card { border-left: 4px solid #e2e8f0; margin-bottom: 12px; transition: all .2s; }
+        .order-card.draft { border-left-color: #94a3b8; }
+        .order-card.confirmed { border-left-color: #2563eb; }
+        .order-card.paid { border-left-color: #059669; }
+        .order-card.cancelled { border-left-color: #dc2626; opacity: .6; }
+        .detail-table { margin: 12px 0; }
+        .detail-table .el-table__header-wrapper th { background: #f8fafc; }
+        .total-row { text-align: right; font-size: 16px; font-weight: 600; padding: 12px 16px; border-top: 2px solid #e2e8f0; }
+        .empty-state { text-align: center; padding: 60px 0; color: #94a3b8; }
+        .empty-state .el-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <admin-layout :active-menu="'community-purchase-orders'">
+        <template #content>
+            <div class="page-wrap" v-loading="pageLoading">
+                <h2 style="margin-bottom:16px">采购订单管理</h2>
+
+                <div class="toolbar">
+                    <el-radio-group v-model="statusFilter" size="small" @change="loadOrders">
+                        <el-radio-button label="">全部</el-radio-button>
+                        <el-radio-button label="draft">草稿</el-radio-button>
+                        <el-radio-button label="confirmed">已确认</el-radio-button>
+                        <el-radio-button label="paid">已支付</el-radio-button>
+                        <el-radio-button label="cancelled">已取消</el-radio-button>
+                    </el-radio-group>
+                </div>
+
+                <!-- 订单列表 -->
+                <div v-if="orders.length > 0">
+                    <div v-for="order in orders" :key="order.id"
+                        :class="['order-card', 'el-card', 'el-card--never', order.status]"
+                        style="cursor:pointer" @click="showDetail(order.id)">
+
+                        <div class="el-card__body" style="padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                            <div>
+                                <div style="font-weight:600;font-size:15px">{{ order.orderNo }}</div>
+                                <div style="font-size:12px;color:#94a3b8;margin-top:4px">{{ order.created_at }}</div>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:16px">
+                                <div style="text-align:right">
+                                    <div style="font-size:12px;color:#64748b">合计</div>
+                                    <div style="font-size:18px;font-weight:700;color:#0f172a">¥{{ order.totalCost }}</div>
+                                </div>
+                                <el-tag :type="order.status === 'draft' ? 'info' : order.status === 'confirmed' ? 'primary' : order.status === 'paid' ? 'success' : 'danger'" size="small" effect="dark">
+                                    {{ order.status === 'draft' ? '草稿' : order.status === 'confirmed' ? '已确认' : order.status === 'paid' ? '已支付' : '已取消' }}
+                                </el-tag>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align:center;margin-top:16px">
+                        <el-pagination
+                            @current-change="onPageChange"
+                            :current-page="page"
+                            :page-size="limit"
+                            :total="total"
+                            layout="prev, pager, next, total">
+                        </el-pagination>
+                    </div>
+                </div>
+
+                <div v-if="orders.length === 0 && !pageLoading" class="empty-state">
+                    <i class="el-icon-s-order"></i>
+                    <p>暂无采购订单，请先在智能选品中进行一键采购</p>
+                </div>
+
+                <!-- 订单详情对话框 -->
+                <el-dialog :title="'采购订单 - ' + (detail.orderNo || '')" :visible.sync="detailVisible" width="700px" top="5vh">
+                    <div v-if="detailLoading" v-loading="detailLoading" style="height:200px"></div>
+                    <div v-if="!detailLoading && detail.id">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                            <div>
+                                <span style="color:#64748b;font-size:13px">状态：</span>
+                                <el-tag :type="detail.status === 'draft' ? 'info' : detail.status === 'confirmed' ? 'primary' : detail.status === 'paid' ? 'success' : 'danger'" size="small" effect="dark">
+                                    {{ detail.status === 'draft' ? '草稿' : detail.status === 'confirmed' ? '已确认' : detail.status === 'paid' ? '已支付' : '已取消' }}
+                                </el-tag>
+                            </div>
+                            <div style="color:#94a3b8;font-size:12px">{{ detail.created_at }}</div>
+                        </div>
+
+                        <!-- 可编辑表格（草稿状态） -->
+                        <el-table :data="detailItems" stripe size="small" class="detail-table">
+                            <el-table-column prop="productName" label="商品名称" min-width="180">
+                                <template slot-scope="s">
+                                    <span>{{ s.row.productName }}</span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column label="数量" width="120" align="center">
+                                <template slot-scope="s">
+                                    <el-input-number v-model="s.row.quantity"
+                                        v-if="detail.status === 'draft'"
+                                        :min="1" :max="99999" size="mini" controls-position="right" style="width:110px">
+                                    </el-input-number>
+                                    <span v-else>{{ s.row.quantity }}</span>
+                                </template>
+                            </el-table-column>
+                            <el-table-column prop="costPrice" label="进价" width="100" align="right">
+                                <template slot-scope="s">¥{{ s.row.costPrice }}</template>
+                            </el-table-column>
+                            <el-table-column prop="subtotal" label="小计" width="100" align="right">
+                                <template slot-scope="s">¥{{ s.row.subtotal }}</template>
+                            </el-table-column>
+                        </el-table>
+
+                        <div class="total-row">
+                            合计：¥{{ detailTotal }}
+                        </div>
+
+                        <!-- 操作按钮 -->
+                        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+                            <el-button v-if="detail.status === 'draft'" size="small" @click="saveChanges">保存调整</el-button>
+                            <el-button v-if="detail.status === 'draft'" type="primary" size="small" @click="confirmOrder">确认订单</el-button>
+                            <el-button v-if="detail.status === 'draft'" type="danger" size="small" plain @click="cancelOrder">取消订单</el-button>
+                            <el-button v-if="detail.status === 'confirmed'" type="success" size="small" @click="payOrder" :loading="paying">
+                                💰 支付 ¥{{ detail.totalCost }}
+                            </el-button>
+                            <el-button size="small" @click="detailVisible = false">关闭</el-button>
+                        </div>
+                    </div>
+                </el-dialog>
+            </div>
+        </template>
+    </admin-layout>
+</div>
+
+<script src="/static/js/vue.js"></script>
+<script src="/static/js/element-ui.min.js"></script>
+<script src="/static/js/axios.min.js"></script>
+<script src="/static/js/config/layout-config.js"></script>
+<script src="/static/js/components/layout.js"></script>
+<script>
+new Vue({
+    el: '#app',
+    data: {
+        pageLoading: false,
+        orders: [],
+        page: 1,
+        limit: 10,
+        total: 0,
+        statusFilter: '',
+        detailVisible: false,
+        detailLoading: false,
+        detail: {},
+        detailItems: [],
+        paying: false,
+    },
+    mounted: function () {
+        this.loadOrders();
+    },
+    methods: {
+        loadOrders: function () {
+            var self = this;
+            self.pageLoading = true;
+            var params = { page: self.page, limit: self.limit };
+            if (self.statusFilter) params.status = self.statusFilter;
+
+            axios.get('/api/supplier/purchase/orders', { params: params })
+                .then(function (res) {
+                    if (res.data.code === 200) {
+                        self.orders = res.data.data.rows || [];
+                        self.total = res.data.data.total || 0;
+                        self.page = res.data.data.page || 1;
+                    } else {
+                        self.$message.error(res.data.message);
+                    }
+                })
+                .catch(function () {
+                    self.$message.error('加载订单列表失败');
+                })
+                .finally(function () {
+                    self.pageLoading = false;
+                });
+        },
+        onPageChange: function (p) {
+            this.page = p;
+            this.loadOrders();
+        },
+        showDetail: function (orderId) {
+            var self = this;
+            self.detailVisible = true;
+            self.detailLoading = true;
+            self.detail = {};
+            self.detailItems = [];
+
+            axios.get('/api/supplier/purchase/orders/' + orderId)
+                .then(function (res) {
+                    if (res.data.code === 200) {
+                        self.detail = res.data.data;
+                        self.detailItems = (res.data.data.items || []).map(function (item) {
+                            return { ...item };
+                        });
+                    } else {
+                        self.$message.error(res.data.message);
+                    }
+                })
+                .catch(function () {
+                    self.$message.error('加载订单详情失败');
+                })
+                .finally(function () {
+                    self.detailLoading = false;
+                });
+        },
+        saveChanges: function () {
+            var self = this;
+            var items = self.detailItems.map(function (item) {
+                return { id: item.id, productId: item.productId, quantity: item.quantity };
+            });
+            axios.put('/api/supplier/purchase/orders/' + self.detail.id, { items: items })
+                .then(function (res) {
+                    if (res.data.code === 200) {
+                        self.$message.success('保存成功');
+                        // 刷新详情
+                        var sid = self.detail.id;
+                        self.showDetail(sid);
+                        self.loadOrders();
+                    } else {
+                        self.$message.error(res.data.message);
+                    }
+                })
+                .catch(function () {
+                    self.$message.error('保存失败');
+                });
+        },
+        confirmOrder: function () {
+            var self = this;
+            self.$confirm('确认后将无法直接修改，是否确认该采购订单？', '确认订单', {
+                confirmButtonText: '确认',
+                cancelButtonText: '取消',
+                type: 'info',
+            }).then(function () {
+                axios.post('/api/supplier/purchase/orders/' + self.detail.id + '/confirm')
+                    .then(function (res) {
+                        if (res.data.code === 200) {
+                            self.$message.success('订单已确认，请进行支付');
+                            self.showDetail(self.detail.id);
+                            self.loadOrders();
+                        } else {
+                            self.$message.error(res.data.message);
+                        }
+                    })
+                    .catch(function () {
+                        self.$message.error('确认失败');
+                    });
+            }).catch(function () {});
+        },
+        payOrder: function () {
+            var self = this;
+            self.$confirm('将按进价支付 ¥' + self.detail.totalCost + '，支付后商品自动入库，是否继续？', '支付确认', {
+                confirmButtonText: '支付',
+                cancelButtonText: '取消',
+                type: 'success',
+            }).then(function () {
+                self.paying = true;
+                axios.post('/api/supplier/purchase/orders/' + self.detail.id + '/pay')
+                    .then(function (res) {
+                        if (res.data.code === 200) {
+                            self.$message.success('支付成功，商品已添加到仓库');
+                            self.detailVisible = false;
+                            self.loadOrders();
+                        } else {
+                            self.$message.error(res.data.message);
+                        }
+                    })
+                    .catch(function () {
+                        self.$message.error('支付请求失败');
+                    })
+                    .finally(function () {
+                        self.paying = false;
+                    });
+            }).catch(function () {});
+        },
+        cancelOrder: function () {
+            var self = this;
+            self.$confirm('确定取消该采购订单？', '取消订单', {
+                confirmButtonText: '确定取消',
+                cancelButtonText: '暂不取消',
+                type: 'warning',
+            }).then(function () {
+                axios.post('/api/supplier/purchase/orders/' + self.detail.id + '/cancel')
+                    .then(function (res) {
+                        if (res.data.code === 200) {
+                            self.$message.success('订单已取消');
+                            self.detailVisible = false;
+                            self.loadOrders();
+                        } else {
+                            self.$message.error(res.data.message);
+                        }
+                    })
+                    .catch(function () {
+                        self.$message.error('取消失败');
+                    });
+            }).catch(function () {});
+        },
+    },
+});
+</script>
+</body>
+</html>

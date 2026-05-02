@@ -186,6 +186,20 @@ const LayoutConfig = {
             roles: ['community_leader', 'supplier']
         },
         {
+            index: 'community-warehouse',
+            title: '仓库管理',
+            path: '/admin/supplier/warehouse.html',
+            icon: 'el-icon-s-management',
+            roles: ['community_leader', 'supplier']
+        },
+        {
+            index: 'community-purchase-orders',
+            title: '采购订单',
+            path: '/admin/supplier/purchase-orders.html',
+            icon: 'el-icon-document-copy',
+            roles: ['community_leader', 'supplier']
+        },
+        {
             index: 'profile',
             title: '个人中心',
             path: '/admin/profile.html',
@@ -218,6 +232,7 @@ const LayoutConfig = {
         },
         community_leader: {
             '社区经营': ['community-analysis', 'community-sales-forecast', 'community-smart-selection'],
+            '采购仓储': ['community-purchase-orders', 'community-warehouse'],
             '订单管理': ['community-orders'],
             '服务管理': ['announcements', 'community-after-sale', 'community-complaints'],
             '个人设置': ['profile']

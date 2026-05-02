@@ -204,6 +204,35 @@
                                         </template>
                                     </el-table-column>
                                     <el-table-column prop="suggestion" label="处理建议" min-width="160"></el-table-column>
+                                    <el-table-column label="折扣操作" width="160" align="center">
+                                        <template slot-scope="s">
+                                            <el-popover v-if="s.row.riskLevel === 'high' || s.row.riskLevel === 'medium'"
+                                                placement="left" width="200" trigger="click">
+                                                <div style="text-align:center">
+                                                    <p style="margin-bottom:12px;font-size:13px">设置折扣率</p>
+                                                    <el-slider v-model="s.row._discountValue"
+                                                        :min="50" :max="100" :step="5"
+                                                        show-input style="padding:0 8px"
+                                                        input-size="mini">
+                                                    </el-slider>
+                                                    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+                                                        <el-button size="mini" type="primary"
+                                                            :loading="s.row._discountLoading"
+                                                            @click="applyDiscount(s.row)">应用</el-button>
+                                                        <el-button size="mini"
+                                                            v-if="s.row.discountRate"
+                                                            @click="clearDiscount(s.row)">清除</el-button>
+                                                    </div>
+                                                </div>
+                                                <el-button slot="reference" size="mini"
+                                                    :type="s.row.discountRate ? 'warning' : 'default'"
+                                                    icon="el-icon-s-marketing" plain>
+                                                    {{ s.row.discountRate ? '已打' + (s.row.discountRate * 100).toFixed(0) + '折' : '打折' }}
+                                                </el-button>
+                                            </el-popover>
+                                            <span v-else style="color:#94a3b8;font-size:12px">-</span>
+                                        </template>
+                                    </el-table-column>
                                 </el-table>
                                 <div v-if="slowMoving.length === 0 && !loading.slowMoving" class="empty-state">
                                     <i class="el-icon-circle-check"></i>
@@ -389,6 +418,12 @@ new Vue({
                                 item.purchaseQuantity = item.recommendedQuantity || 10;
                             });
                         }
+                        if (tabName === 'slowMoving') {
+                            items.forEach(function (item) {
+                                item._discountValue = (item.discountRate ? item.discountRate * 100 : 80);
+                                item._discountLoading = false;
+                            });
+                        }
                         self[dataKey[tabName]] = items;
                         self.selectedProductIds = [];
                         self.$nextTick(function () {
@@ -403,6 +438,41 @@ new Vue({
                 .finally(function () {
                     if (!silent) self.loading[tabName] = false;
                 });
+        },
+        applyDiscount: function (row) {
+            var self = this;
+            var rate = (row._discountValue || 50) / 100;
+            row._discountLoading = true;
+            axios.post('/api/smart-selection/slow-moving/discount', {
+                productId: row.productId,
+                discountRate: rate,
+            }).then(function (res) {
+                if (res.data.code === 200) {
+                    self.$message.success('已设置 ' + (rate * 100).toFixed(0) + '% 折扣');
+                    self.loadTab('slowMoving', true);
+                } else {
+                    self.$message.error(res.data.message);
+                }
+            }).catch(function () {
+                self.$message.error('设置折扣失败');
+            }).finally(function () {
+                row._discountLoading = false;
+            });
+        },
+        clearDiscount: function (row) {
+            var self = this;
+            axios.delete('/api/smart-selection/slow-moving/discount', {
+                params: { productId: row.productId }
+            }).then(function (res) {
+                if (res.data.code === 200) {
+                    self.$message.success('折扣已清除');
+                    self.loadTab('slowMoving', true);
+                } else {
+                    self.$message.error(res.data.message);
+                }
+            }).catch(function () {
+                self.$message.error('清除折扣失败');
+            });
         },
         onTabChange: function (tab) {
             var name = tab.name || tab;
@@ -481,7 +551,7 @@ new Vue({
             var products = self.newProducts
                 .filter(function (item) { return self.selectedProductIds.indexOf(item.productId) !== -1; })
                 .map(function (item) { return { productId: item.productId, quantity: item.purchaseQuantity || 10 }; });
-            self.$confirm('确认采购选中的 ' + products.length + ' 个商品？系统将自动复制到您的商品列表。', '确认采购', {
+            self.$confirm('确认采购选中的 ' + products.length + ' 个商品？系统将自动生成采购订单，请在采购订单管理中确认并支付。', '确认采购', {
                 confirmButtonText: '确认',
                 cancelButtonText: '取消',
                 type: 'info',
@@ -491,14 +561,20 @@ new Vue({
                     products: products,
                 }).then(function (res) {
                     if (res.data.code === 200) {
-                        var count = res.data.data.purchasedCount;
                         var purchasedIds = self.selectedProductIds.slice();
-                        self.$message.success('成功采购 ' + count + ' 个商品');
-                        self.newProducts = self.newProducts.filter(function (item) {
-                            return purchasedIds.indexOf(item.productId) === -1;
+                        self.$confirm(res.data.message + '，是否前往采购订单管理？', '采购成功', {
+                            confirmButtonText: '去查看订单',
+                            cancelButtonText: '继续选品',
+                            type: 'success',
+                        }).then(function () {
+                            window.location.href = '/admin/supplier/purchase-orders.html';
+                        }).catch(function () {
+                            self.newProducts = self.newProducts.filter(function (item) {
+                                return purchasedIds.indexOf(item.productId) === -1;
+                            });
+                            self.selectedProductIds = [];
+                            self.loadDashboard();
                         });
-                        self.selectedProductIds = [];
-                        self.loadDashboard();
                     } else {
                         self.$message.error(res.data.message || '采购失败');
                     }
