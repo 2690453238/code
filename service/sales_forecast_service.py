@@ -340,13 +340,13 @@ class SalesForecastService:
         frame["rolling_sum_14"] = groups.shift(1).rolling(14).sum().reset_index(level=0, drop=True)
         frame["rolling_max_7"] = groups.shift(1).rolling(7).max().reset_index(level=0, drop=True)
 
-        # 星期几历史均值（捕捉周期性）
-        def _dow_avg(group):
-            if len(group) < 7:
-                return pd.Series([float(group["quantity"].mean())] * len(group), index=group.index)
-            dow_map = group.groupby("day_of_week")["quantity"].mean().to_dict()
-            return group["day_of_week"].map(dow_map)
-        frame["dow_avg"] = frame.groupby("product_id", group_keys=False).apply(_dow_avg)
+        # 星期几历史均值（捕捉周期性），使用 transform 避免 apply 索引对齐问题
+        frame["dow_avg"] = frame.groupby(["product_id", "day_of_week"])["quantity"].transform("mean")
+        # 对数据量少的商品（<7天）回退到商品整体均值，防止过拟合
+        product_mean = frame.groupby("product_id")["quantity"].transform("mean")
+        insufficient_data = frame.groupby("product_id")["product_id"].transform("size") < 7
+        frame.loc[insufficient_data, "dow_avg"] = product_mean
+        frame["dow_avg"] = frame["dow_avg"].fillna(product_mean)
 
         # 近期销售标记：过去7天是否有销量
         frame["recent_sale_7d"] = groups.shift(1).rolling(7).sum().reset_index(level=0, drop=True)
@@ -496,7 +496,7 @@ class SalesForecastService:
                 return train_result
         with open(path, "rb") as file_obj:
             artifact = pickle.load(file_obj)
-        if artifact.get("featureColumns") != self._get_feature_columns():
+        if sorted(artifact.get("featureColumns", [])) != sorted(self._get_feature_columns()):
             train_result = self.train_model(supplier_id, forecast_days, test_days)
             if train_result["code"] != 200:
                 return train_result
@@ -611,19 +611,17 @@ class SalesForecastService:
         current_dow_series = product_history[product_history["day_of_week"] == dow]["quantity"]
         dow_avg = float(current_dow_series.mean()) if len(current_dow_series) > 0 else 0.0
 
-        # 距离上次销售天数
-        recent = product_history.tail(14)
+        # 距离上次销售天数（需重置索引，避免 concat 后索引错位）
+        recent = product_history.tail(14).reset_index(drop=True)
         non_zero_days = recent[recent["quantity"] > 0]
-        days_since = len(recent) - (non_zero_days.index[-1] if not non_zero_days.empty else -1)
+        if non_zero_days.empty:
+            days_since = 15
+        else:
+            days_since = len(recent) - int(non_zero_days.index[-1])
 
-        # 品类当日均值
-        cat_col = "category_id"
+        # 品类历史日均销量（预测时无法匹配未来日期，改用历史均值）
         cat_val = int(base_row.get("category_id", 0))
-        cat_date_rows = product_history[
-            (product_history.get(cat_col, None) == cat_val)
-            & (product_history["sale_date"] == future_date)
-        ]
-        cat_avg = float(cat_date_rows["quantity"].mean()) if len(cat_date_rows) > 0 else 0.0
+        cat_avg = float(product_history[product_history["category_id"] == cat_val]["quantity"].mean()) if cat_val > 0 else 0.0
 
         return {
             "sale_date": future_date,
