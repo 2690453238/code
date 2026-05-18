@@ -290,6 +290,11 @@ new Vue({
     },
     mounted() {
         this.checkAuth();
+        if (this.userInfo.role && this.userInfo.role !== 'user') {
+            this.$message.warning('仅普通用户可进行结算');
+            window.location.href = '/front/mall/mall.html';
+            return;
+        }
         this.loadCheckoutData();
         this.loadAddresses();
     },

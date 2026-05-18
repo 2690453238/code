@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, session
 from service.mall.cart_service import CartService
 from service.mall.behavior_service import BehaviorService
 from service.mall.product_service import ProductService
-from utils.auth_utils import login_required
+from utils.auth_utils import login_required, user_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ product_service = ProductService()
 
 
 @cart_bp.route('/', methods=['GET'])
-@login_required
+@user_required
 def get_cart():
     """获取购物车"""
     try:
@@ -31,7 +31,7 @@ def get_cart():
 
 
 @cart_bp.route('/add', methods=['POST'])
-@login_required
+@user_required
 def add_to_cart():
     """添加到购物车"""
     try:
@@ -74,6 +74,7 @@ def add_to_cart():
 
 
 @cart_bp.route('/<int:cart_id>/quantity', methods=['PUT'])
+@user_required
 def update_cart_quantity(cart_id):
     """更新购物车商品数量"""
     try:
@@ -89,6 +90,7 @@ def update_cart_quantity(cart_id):
 
 
 @cart_bp.route('/<int:cart_id>', methods=['DELETE'])
+@user_required
 def remove_from_cart(cart_id):
     """从购物车移除商品"""
     try:
@@ -98,7 +100,7 @@ def remove_from_cart(cart_id):
 
 
 @cart_bp.route('/clear', methods=['DELETE'])
-@login_required
+@user_required
 def clear_cart():
     """清空购物车"""
     try:
@@ -109,7 +111,7 @@ def clear_cart():
 
 
 @cart_bp.route('/count', methods=['GET'])
-@login_required
+@user_required
 def get_cart_count():
     """获取购物车商品数量"""
     try:

@@ -182,6 +182,8 @@
                                 <button v-if="order.status === 'pending'" class="od-btn od-btn-primary" @click="payOrder">立即付款</button>
                                 <button v-if="order.status === 'shipped'" class="od-btn od-btn-success" @click="confirmReceive">确认收货</button>
                                 <button v-if="canCancelOrder()" class="od-btn od-btn-danger" @click="cancelOrder">取消订单</button>
+                                <button v-if="canComplain()" class="od-btn od-btn-danger" @click="showComplaintDialog">投诉</button>
+                                <button v-if="canApplyRefund()" class="od-btn od-btn-danger" @click="showRefundDialog">申请退款</button>
                             </div>
                         </div>
                     </div>
@@ -234,6 +236,64 @@
                 <el-button type="primary" @click="submitReview" :loading="reviewSubmitting">提交评价</el-button>
             </div>
         </el-dialog>
+        <!-- 投诉对话框 -->
+        <el-dialog title="提交投诉" :visible.sync="complaintDialogVisible" width="520px" @close="resetComplaintForm">
+            <el-form :model="complaintForm" label-width="80px">
+                <el-form-item label="投诉类型">
+                    <el-select v-model="complaintForm.type" placeholder="请选择投诉类型" style="width:100%">
+                        <el-option label="订单问题" value="order"></el-option>
+                        <el-option label="商品问题" value="product"></el-option>
+                        <el-option label="服务问题" value="service"></el-option>
+                        <el-option label="平台问题" value="platform"></el-option>
+                        <el-option label="其他" value="other"></el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="投诉标题">
+                    <el-input v-model="complaintForm.title" placeholder="请输入投诉标题" maxlength="100" show-word-limit></el-input>
+                </el-form-item>
+                <el-form-item label="投诉内容">
+                    <el-input v-model="complaintForm.content" type="textarea" :rows="4" placeholder="请详细描述您的问题…" maxlength="500" show-word-limit></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer">
+                <el-button @click="complaintDialogVisible = false">取消</el-button>
+                <el-button type="danger" @click="submitComplaint" :loading="complaintSubmitting">提交投诉</el-button>
+            </div>
+        </el-dialog>
+        <!-- 退款对话框 -->
+        <el-dialog title="申请退款" :visible.sync="refundDialogVisible" width="520px" @close="resetRefundForm">
+            <el-form :model="refundForm" label-width="80px">
+                <el-form-item label="退款类型">
+                    <el-radio-group v-model="refundForm.type">
+                        <el-radio label="only_refund">仅退款（未收到货/不退货）</el-radio>
+                        <el-radio label="return_refund">退货退款</el-radio>
+                    </el-radio-group>
+                </el-form-item>
+                <el-form-item label="退款金额">
+                    <el-input v-model="refundForm.amount" placeholder="请输入退款金额" style="width:200px">
+                        <template slot="prepend">¥</template>
+                    </el-input>
+                    <span style="font-size:12px;color:#b09090;margin-left:10px;">可退最高 ¥{{ order ? order.payAmount : 0 }}</span>
+                </el-form-item>
+                <el-form-item label="退款原因">
+                    <el-select v-model="refundForm.reason" placeholder="请选择退款原因" style="width:100%">
+                        <el-option label="商品质量有问题" value="商品质量有问题"></el-option>
+                        <el-option label="商品与描述不符" value="商品与描述不符"></el-option>
+                        <el-option label="商家发错货" value="商家发错货"></el-option>
+                        <el-option label="不想要了" value="不想要了"></el-option>
+                        <el-option label="商品破损" value="商品破损"></el-option>
+                        <el-option label="其他原因" value="其他原因"></el-option>
+                    </el-select>
+                </el-form-item>
+                <el-form-item label="补充说明">
+                    <el-input v-model="refundForm.description" type="textarea" :rows="3" placeholder="请详细描述..." maxlength="500" show-word-limit></el-input>
+                </el-form-item>
+            </el-form>
+            <div slot="footer">
+                <el-button @click="refundDialogVisible = false">取消</el-button>
+                <el-button type="danger" @click="submitRefund" :loading="refundSubmitting">提交申请</el-button>
+            </div>
+        </el-dialog>
     </front-layout>
 </div>
 
@@ -257,7 +317,13 @@ new Vue({
             reviewDialogVisible: false,
             currentReviewItem: null,
             reviewSubmitting: false,
-            reviewForm: { rating: 5, content: '' }
+            reviewForm: { rating: 5, content: '' },
+            complaintDialogVisible: false,
+            complaintSubmitting: false,
+            complaintForm: { type: 'order', title: '', content: '' },
+            refundDialogVisible: false,
+            refundSubmitting: false,
+            refundForm: { type: 'only_refund', amount: '', reason: '', description: '' }
         }
     },
     mounted() {
@@ -323,6 +389,94 @@ new Vue({
                 if (r.code === 200) { this.$message.success('取消申请已提交，请等待审核'); this.loadOrderDetail(); }
                 else { this.$message.error(r.message); }
             } catch(e) { if (e !== 'cancel') this.$message.error('提交取消申请失败'); }
+        },
+        canComplain() {
+            if (!this.order) return false;
+            return !['pending', 'cancelled', 'cancel_requested'].includes(this.order.status);
+        },
+        showComplaintDialog() {
+            this.complaintForm = { type: 'order', title: '', content: '' };
+            this.complaintDialogVisible = true;
+        },
+        resetComplaintForm() {
+            this.complaintForm = { type: 'order', title: '', content: '' };
+        },
+        async submitComplaint() {
+            if (!this.complaintForm.title) { this.$message.error('请输入投诉标题'); return; }
+            if (!this.complaintForm.content) { this.$message.error('请输入投诉内容'); return; }
+            this.complaintSubmitting = true;
+            try {
+                const res = await fetch('/api/complaint/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: this.complaintForm.type,
+                        title: this.complaintForm.title,
+                        content: this.complaintForm.content,
+                        orderId: this.orderId,
+                        orderNo: this.order.orderNo
+                    })
+                });
+                const r = await res.json();
+                if (r.code === 200) {
+                    this.$message.success(r.message);
+                    this.complaintDialogVisible = false;
+                } else {
+                    this.$message.error(r.message);
+                }
+            } catch(e) {
+                this.$message.error('提交投诉失败');
+            } finally {
+                this.complaintSubmitting = false;
+            }
+        },
+        canApplyRefund() {
+            if (!this.order) return false;
+            return !['pending', 'cancelled', 'cancel_requested'].includes(this.order.status);
+        },
+        showRefundDialog() {
+            this.refundForm = {
+                type: 'only_refund',
+                amount: this.order ? this.order.payAmount : '',
+                reason: '',
+                description: ''
+            };
+            this.refundDialogVisible = true;
+        },
+        resetRefundForm() {
+            this.refundForm = { type: 'only_refund', amount: '', reason: '', description: '' };
+        },
+        async submitRefund() {
+            if (!this.refundForm.amount || parseFloat(this.refundForm.amount) <= 0) {
+                this.$message.error('请输入正确的退款金额'); return;
+            }
+            if (!this.refundForm.reason) { this.$message.error('请选择退款原因'); return; }
+            this.refundSubmitting = true;
+            try {
+                const res = await fetch('/api/mall/refund/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: this.orderId,
+                        orderNo: this.order.orderNo,
+                        type: this.refundForm.type,
+                        amount: parseFloat(this.refundForm.amount),
+                        reason: this.refundForm.reason,
+                        description: this.refundForm.description
+                    })
+                });
+                const r = await res.json();
+                if (r.code === 200) {
+                    this.$message.success(r.message);
+                    this.refundDialogVisible = false;
+                } else {
+                    this.$message.error(r.message);
+                }
+            } catch(e) {
+                this.$message.error('提交退款申请失败');
+            } finally {
+                this.refundSubmitting = false;
+            }
         },
         showReviewDialog(item) {
             this.currentReviewItem = item;

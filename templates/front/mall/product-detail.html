@@ -621,9 +621,10 @@
                                 </el-input-number>
                             </div>
                             
-                            <el-button 
-                                type="primary" 
+                            <el-button
+                                type="primary"
                                 size="large"
+                                v-if="userInfo.role === 'user'"
                                 @click="addToCart"
                                 :disabled="product.stock <= 0">
                                 加入购物车
@@ -689,12 +690,12 @@
                                         <span class="bundle-price">
                                             组合价 ¥{{ priceFmt(item.bundleStrategy.suggestedAmount) }}
                                         </span>
-                                        <el-button size="mini" type="warning" @click="addBundleToCart(item)">
+                                        <el-button v-if="userInfo.role === 'user'" size="mini" type="warning" @click="addBundleToCart(item)">
                                             组合加购
-                                        </el-button>
                                     </div>
                                 </div>
                                 <el-button
+                                    v-if="userInfo.role === 'user'"
                                     size="mini"
                                     type="primary"
                                     plain

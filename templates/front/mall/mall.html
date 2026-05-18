@@ -613,10 +613,10 @@
                                         <div class="price-now"><span>¥</span>{{ product.discountRate ? (product.price * product.discountRate).toFixed(2) : product.price }}</div>
                                     </div>
                                     <div class="card-actions">
-                                        <button class="btn-cart" @click="addToCart(product)">
+                                        <button class="btn-cart" v-if="userInfo.role === 'user'" @click="addToCart(product)">
                                             <i class="el-icon-shopping-cart-2"></i> 加入购物车
                                         </button>
-                                        <button class="btn-detail" @click="viewProduct(product.id)">
+                                        <button class="btn-detail" @click="viewProduct(product.id)" :style="userInfo.role !== 'user' ? 'flex:1' : ''">
                                             查看详情
                                         </button>
                                     </div>

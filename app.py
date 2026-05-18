@@ -19,6 +19,7 @@ from controller.upload_controller import upload_bp
 from controller.announcement_bp import announcement_bp
 from controller.dashboard_controller import dashboard_bp
 from controller.mall.behavior_controller import behavior_bp
+from controller.mall.refund_controller import refund_bp
 
 # 商城模块蓝图
 from controller.mall.category_controller import category_bp
@@ -56,6 +57,7 @@ app.register_blueprint(supplier_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(complaint_bp, url_prefix='/api/complaint')
+app.register_blueprint(refund_bp)
 app.register_blueprint(smart_selection_bp)
 app.register_blueprint(purchase_bp)
 

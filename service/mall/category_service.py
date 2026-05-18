@@ -38,11 +38,11 @@ class CategoryService:
             
             tree = []
             for category in categories:
-                if category['parentId'] == 0:
+                parent_id = category['parentId']
+                if not parent_id or parent_id == 0:
                     tree.append(category)
-                else:
-                    if category['parentId'] in category_dict:
-                        category_dict[category['parentId']]['children'].append(category)
+                elif parent_id in category_dict:
+                    category_dict[parent_id]['children'].append(category)
             
             return success(tree)
         except Exception as e:

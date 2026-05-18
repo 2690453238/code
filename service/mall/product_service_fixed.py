@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from service.mall.product_service import ProductService as BaseProductService
 
@@ -69,6 +69,104 @@ class ProductService(BaseProductService):
         new_products = [p for p in result['rows'] if p.get('isNew') == 1]
         from utils.response import success
         return success(new_products)
+
+    def get_related_recommendations(
+        self, product_id: int, limit: int = 6,
+        user_info: Optional[Dict] = None
+    ) -> Dict:
+        supplier_id = self._get_supplier_scope_id(user_info)
+        return super().get_related_recommendations(product_id, limit) \
+            if supplier_id is None else self._get_recommendations_scoped(product_id, limit, supplier_id)
+
+    def _get_recommendations_scoped(self, product_id: int, limit: int, supplier_id: int) -> Dict:
+        from utils.db_utils import get_db_connection
+        from utils.response import success, error
+        from model.mall.product_model import ProductModel
+
+        with get_db_connection() as conn:
+            product_model = ProductModel(conn)
+            product = product_model.get_product_by_id(product_id)
+        if not product:
+            return error("商品不存在")
+
+        association_rows = self._query_association_rows_scoped(product_id, limit, supplier_id)
+        recommendations = self._format_recommendations(product, association_rows)
+        if not recommendations:
+            fallback_rows = self._query_fallback_products_scoped(product, product_id, limit, supplier_id)
+            recommendations = self._format_fallback_recommendations(product, fallback_rows)
+
+        return success({
+            'productId': product_id,
+            'recommendations': recommendations,
+            'bundleStrategies': self._build_bundle_strategies(product, recommendations)
+        })
+
+    def _query_association_rows_scoped(
+        self, product_id: int, limit: int, supplier_id: int
+    ) -> List[Dict[str, Any]]:
+        from utils.db_utils import get_db_connection
+        placeholders = ', '.join(['%s'] * len(self.VALID_ORDER_STATUS))
+        sql = f"""
+            SELECT
+                p.id, p.name, p.mainImage, p.price, p.originalPrice, p.stock, p.sales,
+                p.categoryId, c.name AS categoryName,
+                pair_stats.pairCount, target_stats.targetOrderCount,
+                related_stats.relatedOrderCount, total_stats.totalOrderCount
+            FROM (
+                SELECT
+                    CASE WHEN oi1.productId = %s THEN oi2.productId ELSE oi1.productId END AS relatedProductId,
+                    COUNT(DISTINCT oi1.orderId) AS pairCount
+                FROM py_order_item oi1
+                JOIN py_order_item oi2 ON oi1.orderId = oi2.orderId AND oi1.productId <> oi2.productId
+                JOIN py_order o ON oi1.orderId = o.id
+                WHERE (oi1.productId = %s OR oi2.productId = %s)
+                  AND o.status IN ({placeholders})
+                GROUP BY relatedProductId
+            ) pair_stats
+            JOIN py_product p ON pair_stats.relatedProductId = p.id AND p.status = 1 AND p.supplierId = %s
+            LEFT JOIN py_category c ON p.categoryId = c.id
+            CROSS JOIN (
+                SELECT COUNT(DISTINCT orderId) AS targetOrderCount
+                FROM py_order_item
+                WHERE productId = %s
+            ) target_stats
+            JOIN (
+                SELECT productId, COUNT(DISTINCT orderId) AS relatedOrderCount
+                FROM py_order_item
+                GROUP BY productId
+            ) related_stats ON related_stats.productId = p.id
+            CROSS JOIN (
+                SELECT COUNT(*) AS totalOrderCount
+                FROM py_order
+                WHERE status IN ({placeholders})
+            ) total_stats
+            ORDER BY pair_stats.pairCount DESC, p.sales DESC
+            LIMIT %s
+        """
+        params = [product_id, product_id, product_id] + list(self.VALID_ORDER_STATUS)
+        params += [supplier_id, product_id] + list(self.VALID_ORDER_STATUS) + [limit]
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, params)
+                return cursor.fetchall()
+
+    def _query_fallback_products_scoped(
+        self, product: Dict[str, Any], product_id: int, limit: int, supplier_id: int
+    ) -> List[Dict[str, Any]]:
+        from utils.db_utils import get_db_connection
+        sql = """
+            SELECT p.id, p.name, p.mainImage, p.price, p.originalPrice, p.stock,
+                   p.sales, p.categoryId, c.name AS categoryName
+            FROM py_product p
+            LEFT JOIN py_category c ON p.categoryId = c.id
+            WHERE p.status = 1 AND p.id <> %s AND p.categoryId = %s AND p.supplierId = %s
+            ORDER BY p.sales DESC, p.isHot DESC, p.createTime DESC
+            LIMIT %s
+        """
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute(sql, (product_id, product.get('categoryId'), supplier_id, limit))
+                return cursor.fetchall()
 
     def create_product(self, product_data: Dict, user_info: Optional[Dict] = None) -> Dict:
         supplier_id = self._get_supplier_scope_id(user_info)

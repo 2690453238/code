@@ -86,16 +86,6 @@
                                 <el-option label="已驳回"   value="rejected"></el-option>
                             </el-select>
                         </el-form-item>
-                        <el-form-item label="类型">
-                            <el-select v-model="search.type" placeholder="全部" clearable style="width:120px">
-                                <el-option label="全部"     value=""></el-option>
-                                <el-option label="订单投诉" value="order"></el-option>
-                                <el-option label="商品投诉" value="product"></el-option>
-                                <el-option label="服务投诉" value="service"></el-option>
-                                <el-option label="平台投诉" value="platform"></el-option>
-                                <el-option label="其他"     value="other"></el-option>
-                            </el-select>
-                        </el-form-item>
                         <el-form-item>
                             <el-button type="primary" @click="handleSearch"><i class="el-icon-search"></i> 搜索</el-button>
                             <el-button @click="handleReset"><i class="el-icon-refresh"></i> 重置</el-button>
@@ -112,11 +102,6 @@
                             <template slot-scope="s">
                                 <div>{{ s.row.nickname || s.row.username }}</div>
                                 <div style="font-size:12px;color:#909399">{{ s.row.phone }}</div>
-                            </template>
-                        </el-table-column>
-                        <el-table-column label="类型" align="center">
-                            <template slot-scope="s">
-                                <el-tag size="mini" type="info" effect="plain">{{ typeLabel[s.row.type] }}</el-tag>
                             </template>
                         </el-table-column>
                         <el-table-column prop="title" label="投诉标题"   show-overflow-tooltip></el-table-column>
@@ -172,7 +157,6 @@
                         <el-descriptions-item label="投诉单号" :span="2">{{ current.complaintNo }}</el-descriptions-item>
                         <el-descriptions-item label="投诉用户">{{ current.nickname || current.username }} ({{ current.phone }})</el-descriptions-item>
                         <el-descriptions-item label="提交时间">{{ current.createTime }}</el-descriptions-item>
-                        <el-descriptions-item label="投诉类型">{{ typeLabel[current.type] }}</el-descriptions-item>
                         <el-descriptions-item label="当前状态">
                             <el-tag size="small" :type="statusType[current.status]" effect="plain">{{ statusLabel[current.status] }}</el-tag>
                         </el-descriptions-item>
@@ -262,7 +246,15 @@ new Vue({
     el: '#app',
     data() {
         return {
-            activeMenu: 'complaints',
+            activeMenu: (function(){
+                try {
+                    const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+                    const role = info.role || '';
+                    return (role === 'community_leader' || role === 'supplier') ? 'community-complaints' : 'complaints';
+                } catch(e) {
+                    return 'complaints';
+                }
+            })(),
             userRole: '',
             loading: false,
             replying: false,
@@ -273,7 +265,7 @@ new Vue({
             current: null,
             currentImages: [],
             stats: { total:0, pending:0, processing:0, resolved:0, rejected:0, closed:0 },
-            search: { keyword:'', status:'', type:'' },
+            search: { keyword:'', status:'' },
             pagination: { pageNum:1, pageSize:10, total:0 },
             replyForm: { status:'processing', replyContent:'' },
             statusLabel: { pending:'待处理', processing:'处理中', resolved:'已解决', rejected:'已驳回', closed:'已关闭' },
@@ -297,7 +289,6 @@ new Vue({
                     pageNum: this.pagination.pageNum,
                     pageSize: this.pagination.pageSize,
                     status: this.search.status,
-                    type: this.search.type,
                     keyword: this.search.keyword
                 }
             }).then(res => {

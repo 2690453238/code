@@ -38,7 +38,7 @@
 </head>
 <body>
     <div id="app">
-        <admin-layout :user-info="userInfo" active-menu="mall-orders">
+        <admin-layout :user-info="userInfo" :active-menu="activeMenu">
             <template #content>
                 <div class="order-container">
                 <div class="order-header">
@@ -323,6 +323,15 @@
             el: '#app', 
             data() {
                 return {
+                    activeMenu: (function(){
+                        try {
+                            const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+                            const role = info.role || '';
+                            return (role === 'community_leader' || role === 'supplier') ? 'community-orders' : 'operator-orders';
+                        } catch(e) {
+                            return 'mall-orders';
+                        }
+                    })(),
                     userInfo: {},
                     userRole: '',
                     orders: [],

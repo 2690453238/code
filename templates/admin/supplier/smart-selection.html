@@ -19,35 +19,18 @@
         .hero-section .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
         .hero-section .el-tag { background: rgba(255,255,255,.2); color: #fff; border: none; }
 
-        .kpi-card .el-card__body { padding: 20px 24px; }
-        .kpi-box { text-align: center; }
-        .kpi-title { font-size: 13px; color: #64748b; margin-bottom: 4px; }
-        .kpi-value { font-size: 28px; font-weight: 700; color: #0f172a; }
-        .kpi-value.highlight-danger { color: #dc2626; }
-        .kpi-value.highlight-warning { color: #d97706; }
-        .kpi-value.highlight-success { color: #059669; }
-        .kpi-value.highlight-primary { color: #2563eb; }
-        .kpi-desc { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-
-        .section-card { margin-bottom: 16px; }
-        .section-card .el-card__header {
-            padding: 14px 20px;
-            font-size: 15px;
-            font-weight: 600;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-        }
-        .el-tag.diy-high { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
-        .el-tag.diy-medium { background: #fffbeb; color: #d97706; border-color: #fde68a; }
-        .el-tag.diy-low { background: #f0fdf4; color: #059669; border-color: #bbf7d0; }
-
         .empty-state { padding: 40px 0; text-align: center; color: #94a3b8; }
         .empty-state .el-icon { font-size: 48px; margin-bottom: 12px; display: block; }
 
+        .summary-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        .summary-row .summary-card { flex: 1; min-width: 140px; background: #f8fafc; border-radius: 10px; padding: 14px 18px; border: 1px solid #e2e8f0; }
+        .summary-row .summary-card .num { font-size: 26px; font-weight: 700; }
+        .summary-row .summary-card .lbl { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+        .action-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .action-bar .info-text { font-size: 13px; color: #64748b; }
         .page-wrap { min-height: calc(100vh - 140px); }
         .tab-content { padding-top: 4px; }
-
-        .health-chart-box { height: 240px; }
     </style>
 </head>
 <body>
@@ -66,52 +49,17 @@
                     </div>
                 </div>
 
-                <!-- KPI Cards -->
-                <el-row :gutter="16" style="margin-bottom:20px">
-                    <el-col :xs="12" :sm="12" :lg="6" style="margin-bottom:12px">
-                        <el-card shadow="never" class="kpi-card">
-                            <div class="kpi-box">
-                                <div class="kpi-title">待选新品</div>
-                                <div class="kpi-value highlight-primary">{{ dashboard.newProductCount || 0 }}</div>
-                                <div class="kpi-desc">平台热门未上架商品</div>
-                            </div>
-                        </el-card>
-                    </el-col>
-                    <el-col :xs="12" :sm="12" :lg="6" style="margin-bottom:12px">
-                        <el-card shadow="never" class="kpi-card">
-                            <div class="kpi-box">
-                                <div class="kpi-title">滞销商品</div>
-                                <div class="kpi-value highlight-danger">
-                                    {{ dashboard.slowHighCount || 0 }}
-                                    <small style="font-size:14px;color:#94a3b8">/ {{ dashboard.slowMovingCount || 0 }}</small>
-                                </div>
-                                <div class="kpi-desc">高风险 / 总计</div>
-                            </div>
-                        </el-card>
-                    </el-col>
-                    <el-col :xs="12" :sm="12" :lg="6" style="margin-bottom:12px">
-                        <el-card shadow="never" class="kpi-card">
-                            <div class="kpi-box">
-                                <div class="kpi-title">待补货</div>
-                                <div class="kpi-value highlight-warning">{{ dashboard.urgentRestockCount || 0 }}</div>
-                                <div class="kpi-desc">库存不足需紧急补货</div>
-                            </div>
-                        </el-card>
-                    </el-col>
-                    <el-col :xs="12" :sm="12" :lg="6" style="margin-bottom:12px">
-                        <el-card shadow="never" class="kpi-card">
-                            <div class="kpi-box">
-                                <div class="kpi-title">应季推荐</div>
-                                <div class="kpi-value highlight-success">{{ dashboard.seasonalCount || 0 }}</div>
-                                <div class="kpi-desc">当前季节热销商品</div>
-                            </div>
-                        </el-card>
-                    </el-col>
-                </el-row>
+                <!-- 数据概览 -->
+                <div class="summary-row">
+                    <div class="summary-card"><div class="num" style="color:#2563eb">{{ dashboard.newProductCount || 0 }}</div><div class="lbl">待选新品</div></div>
+                    <div class="summary-card"><div class="num" style="color:#dc2626">{{ dashboard.slowHighCount || 0 }}<small style="font-size:14px;color:#94a3b8">/{{ dashboard.slowMovingCount || 0 }}</small></div><div class="lbl">滞销商品 <small style="color:#94a3b8">高危/总计</small></div></div>
+                    <div class="summary-card"><div class="num" style="color:#d97706">{{ dashboard.urgentRestockCount || 0 }}</div><div class="lbl">待补货</div></div>
+                    <div class="summary-card"><div class="num" style="color:#059669">{{ dashboard.seasonalCount || 0 }}</div><div class="lbl">应季推荐</div></div>
+                    <div class="summary-card"><div class="num" style="color:#6366f1">{{ dashboard.inventoryHealth ? dashboard.inventoryHealth.healthy : '-' }}</div><div class="lbl">库存健康</div></div>
+                </div>
 
                 <!-- Tabs -->
-                <el-card shadow="never" class="section-card">
-                    <el-tabs v-model="activeTab" @tab-click="onTabChange">
+                <el-tabs v-model="activeTab" @tab-click="onTabChange" style="background:#fff;border-radius:12px;padding:0 4px;box-shadow:0 1px 3px rgba(0,0,0,.06);">
                         <el-tab-pane label="新品推荐" name="newProducts">
                             <div class="tab-content">
                                 <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
@@ -242,48 +190,38 @@
 
                         <el-tab-pane label="补货优先级" name="restockPriority">
                             <div class="tab-content">
-                                <el-row :gutter="16">
-                                    <el-col :lg="16">
-                                        <el-table :data="restockPriority" stripe size="small" v-loading="loading.restockPriority">
-                                            <el-table-column prop="productName" label="商品名称" min-width="180">
-                                                <template slot-scope="s">
-                                                    <div style="display:flex;align-items:center;gap:10px">
-                                                        <img :src="s.row.mainImage" style="width:36px;height:36px;border-radius:6px;object-fit:cover;background:#f1f5f9" @error="onImgError">
-                                                        <span>{{ s.row.productName }}</span>
-                                                    </div>
-                                                </template>
-                                            </el-table-column>
-                                            <el-table-column prop="stock" label="库存" width="70" align="right"></el-table-column>
-                                            <el-table-column prop="sellableDays" label="可售天数" width="90" align="right">
-                                                <template slot-scope="s">{{ s.row.sellableDays !== null ? s.row.sellableDays : '∞' }}</template>
-                                            </el-table-column>
-                                            <el-table-column prop="dailyAvgSales" label="日均销量" width="90" align="right"></el-table-column>
-                                            <el-table-column prop="weekSales" label="近7天销量" width="100" align="right"></el-table-column>
-                                            <el-table-column label="建议补货" width="100" align="right">
-                                                <template slot-scope="s">
-                                                    <span style="color:#059669;font-weight:600">{{ s.row.suggestedRestock }}</span>
-                                                </template>
-                                            </el-table-column>
-                                            <el-table-column label="优先级" width="110" align="center">
-                                                <template slot-scope="s">
-                                                    <el-tag :type="s.row.priorityLevel === 1 ? 'danger' : s.row.priorityLevel === 2 ? 'warning' : s.row.priorityLevel === 3 ? 'info' : 'success'" size="mini" effect="dark">
-                                                        {{ s.row.priorityLabel }}
-                                                    </el-tag>
-                                                </template>
-                                            </el-table-column>
-                                        </el-table>
-                                        <div v-if="restockPriority.length === 0 && !loading.restockPriority" class="empty-state">
-                                            <i class="el-icon-sold-out"></i>
-                                            <p>暂无需要补货的商品</p>
-                                        </div>
-                                    </el-col>
-                                    <el-col :lg="8">
-                                        <el-card shadow="never">
-                                            <div slot="header">补货紧迫度分布</div>
-                                            <div id="restockChart" class="health-chart-box"></div>
-                                        </el-card>
-                                    </el-col>
-                                </el-row>
+                                <el-table :data="restockPriority" stripe size="small" v-loading="loading.restockPriority">
+                                    <el-table-column prop="productName" label="商品名称" min-width="180">
+                                        <template slot-scope="s">
+                                            <div style="display:flex;align-items:center;gap:10px">
+                                                <img :src="s.row.mainImage" style="width:36px;height:36px;border-radius:6px;object-fit:cover;background:#f1f5f9" @error="onImgError">
+                                                <span>{{ s.row.productName }}</span>
+                                            </div>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="stock" label="库存" width="70" align="right"></el-table-column>
+                                    <el-table-column prop="sellableDays" label="可售天数" width="90" align="right">
+                                        <template slot-scope="s">{{ s.row.sellableDays !== null ? s.row.sellableDays : '∞' }}</template>
+                                    </el-table-column>
+                                    <el-table-column prop="dailyAvgSales" label="日均销量" width="90" align="right"></el-table-column>
+                                    <el-table-column prop="weekSales" label="近7天销量" width="100" align="right"></el-table-column>
+                                    <el-table-column label="建议补货" width="100" align="right">
+                                        <template slot-scope="s">
+                                            <span style="color:#059669;font-weight:600">{{ s.row.suggestedRestock }}</span>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column label="优先级" width="110" align="center">
+                                        <template slot-scope="s">
+                                            <el-tag :type="s.row.priorityLevel === 1 ? 'danger' : s.row.priorityLevel === 2 ? 'warning' : s.row.priorityLevel === 3 ? 'info' : 'success'" size="mini" effect="dark">
+                                                {{ s.row.priorityLabel }}
+                                            </el-tag>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
+                                <div v-if="restockPriority.length === 0 && !loading.restockPriority" class="empty-state">
+                                    <i class="el-icon-sold-out"></i>
+                                    <p>暂无需要补货的商品</p>
+                                </div>
                             </div>
                         </el-tab-pane>
 
@@ -317,7 +255,6 @@
                             </div>
                         </el-tab-pane>
                     </el-tabs>
-                </el-card>
 
             </div>
         </template>
@@ -326,7 +263,6 @@
 
 <script src="/static/js/vue.js"></script>
 <script src="/static/js/element-ui.min.js"></script>
-<script src="/static/js/echarts.min.js"></script>
 <script src="/static/js/axios.min.js"></script>
 <script src="/static/js/config/layout-config.js"></script>
 <script src="/static/js/components/layout.js"></script>
@@ -348,7 +284,6 @@ new Vue({
             restockPriority: false,
             seasonal: false,
         },
-        charts: {},
         selectedProductIds: [],
         purchasing: false,
     },
@@ -426,7 +361,6 @@ new Vue({
                         self[dataKey[tabName]] = items;
                         self.selectedProductIds = [];
                         self.$nextTick(function () {
-                            if (tabName === 'restockPriority') self.renderRestockChart();
                             if (tabName === 'newProducts') self.preselectNewProducts(items);
                         });
                     }
@@ -483,47 +417,7 @@ new Vue({
             };
             if (!hasData[name]) {
                 this.loadTab(name);
-            } else {
-                this.$nextTick(function () {
-                    if (name === 'restockPriority') this.renderRestockChart();
-                });
             }
-        },
-        getChart: function (id) {
-            var el = document.getElementById(id);
-            if (!el) return null;
-            if (!this.charts[id]) {
-                this.charts[id] = echarts.init(el);
-            }
-            return this.charts[id];
-        },
-        renderRestockChart: function () {
-            var chart = this.getChart('restockChart');
-            if (!chart) return;
-            var data = this.restockPriority.slice(0, 10).reverse();
-            var names = data.map(function (d) { return d.productName.length > 8 ? d.productName.slice(0, 8) + '..' : d.productName; });
-            var values = data.map(function (d) {
-                if (d.priorityLevel === 1) return 4;
-                if (d.priorityLevel === 2) return 3;
-                if (d.priorityLevel === 3) return 2;
-                return 1;
-            });
-            var colors = values.map(function (v) {
-                return v >= 4 ? '#dc2626' : v >= 3 ? '#d97706' : v >= 2 ? '#2563eb' : '#94a3b8';
-            });
-            chart.setOption({
-                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-                grid: { left: 10, right: 20, top: 10, bottom: 10, containLabel: true },
-                xAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
-                yAxis: { type: 'value', min: 0, max: 5, splitLine: { lineStyle: { type: 'dashed', color: '#e2e8f0' } }, axisLabel: { show: false } },
-                series: [{
-                    type: 'bar',
-                    data: values.map(function (v, i) {
-                        return { value: v, itemStyle: { color: colors[i], borderRadius: [4, 4, 0, 0] } };
-                    }),
-                    barWidth: 20,
-                }],
-            });
         },
         onNewProductSelectionChange: function (rows) {
             this.selectedProductIds = rows.map(function (r) { return r.productId; });

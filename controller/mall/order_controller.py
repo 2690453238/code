@@ -4,7 +4,7 @@
 from flask import Blueprint, jsonify, request, session
 from service.mall.behavior_service import BehaviorService
 from service.mall.order_service import OrderService
-from utils.auth_utils import login_required
+from utils.auth_utils import login_required, user_required
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def get_orders():
 
 
 @order_bp.route('/create', methods=['POST'])
-@login_required
+@user_required
 def create_order():
     """创建订单"""
     try:
@@ -79,7 +79,7 @@ def get_order_detail(order_id):
 
 
 @order_bp.route('/<int:order_id>/pay', methods=['POST'])
-@login_required
+@user_required
 def pay_order(order_id):
     """支付订单"""
     try:

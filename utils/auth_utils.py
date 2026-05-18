@@ -56,6 +56,23 @@ def teacher_required(f):
     return decorated_function
 
 
+def user_required(f):
+    """普通用户权限验证装饰器（仅 role=user 可访问）"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            logger.warning("用户未登录，访问被拒绝")
+            return jsonify(error("请先登录", 401))
+
+        user_role = session.get('role')
+        if user_role != 'user':
+            logger.warning(f"用户 {session.get('username')} 角色为 {user_role}，无权进行购物操作")
+            return jsonify(error("仅普通用户可进行购物操作", 403))
+
+        return f(*args, **kwargs)
+    return decorated_function
+
+
 def get_current_user():
     """获取当前登录用户信息"""
     if 'user_id' in session:

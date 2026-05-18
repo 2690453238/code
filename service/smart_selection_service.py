@@ -9,6 +9,28 @@ from utils.response import error, success
 
 from service.purchase_service import PurchaseService
 
+# 销量预测缓存（模块级，避免每次请求都重新训练）
+_forecast_cache: Dict[str, Any] = {"data": None, "expires_at": 0}
+
+
+def _get_cached_forecast(supplier_id=None, forecast_days=7) -> Dict[str, Any]:
+    """获取缓存的销量预测结果（缓存5分钟）"""
+    global _forecast_cache
+    now = datetime.now().timestamp()
+    if now < _forecast_cache["expires_at"] and _forecast_cache["data"] is not None:
+        return _forecast_cache["data"]
+    try:
+        from service.sales_forecast_service import get_forecast_service
+        result = get_forecast_service().batch_predict(
+            supplier_id=supplier_id, forecast_days=forecast_days
+        )
+        if result.get("code") == 200:
+            _forecast_cache["data"] = result
+            _forecast_cache["expires_at"] = now + 300  # 5分钟缓存
+        return result
+    except Exception:
+        return {"code": 500, "data": {"productPredictions": []}}
+
 
 class SmartSelectionService:
     """智能选品服务"""
@@ -24,16 +46,22 @@ class SmartSelectionService:
     RESTOCK_HIGH_DAYS = 7
     RESTOCK_NORMAL_DAYS = 14
 
+    def __init__(self):
+        self._affinity_cache: Dict[Tuple[int, int], float] = {}
+
     def get_dashboard(self, supplier_id: Optional[int]) -> Dict[str, Any]:
         """选品总览看板"""
         try:
             new_count = self._count_new_product_candidates(supplier_id)
-            slow_moving = self._query_slow_moving(supplier_id)
+            slow_moving = self._query_slow_moving(supplier_id, limit=200)
             slow_high = sum(1 for p in slow_moving if p.get("riskLevel") == "high")
             slow_medium = sum(1 for p in slow_moving if p.get("riskLevel") == "medium")
-            urgent = self._count_urgent_restock(supplier_id)
+            restock = self._query_restock_priorities(supplier_id, limit=200)
+            urgent = sum(1 for p in restock if p.get("priorityLevel") == 1)
             seasonal = self._count_seasonal_candidates(supplier_id)
-            health = self._compute_inventory_health(supplier_id)
+            health = self._compute_inventory_health(
+                supplier_id, slow_moving, restock
+            )
             return success({
                 "newProductCount": new_count,
                 "slowMovingCount": len(slow_moving),
@@ -94,18 +122,20 @@ class SmartSelectionService:
         """计算新品推荐综合分数（社区团长端加重本社区偏好）"""
         sales = float(row.get("sales") or 0)
         browse_count = float(row.get("browse_count") or 0)
-        is_hot = 10 if row.get("isHot") else 0
-        is_new = 5 if row.get("isNew") else 0
-        price = float(row.get("price") or 0)
-        price_penalty = min(price / 100, 20)
-        score = sales * 0.4 + browse_count * 0.3 + is_hot + is_new - price_penalty
+        is_hot = 40 if row.get("isHot") else 0   # 相当于100销量，确保热推商品能影响排序
+        is_new = 20 if row.get("isNew") else 0   # 相当于50销量，新品有曝光机会
+        score = sales * 0.4 + browse_count * 0.3 + is_hot + is_new
 
-        # 社区偏好加成：该品类在本社区的销量越好，加成越高
+        # 社区偏好加成（使用缓存避免 N+1 查询）
         if supplier_id is not None:
             category_id = row.get("categoryId")
             if category_id:
-                affinity = self._get_category_community_affinity(supplier_id, category_id)
-                score += affinity * 15  # 最高可加15分
+                cache_key = (supplier_id, category_id)
+                affinity = self._affinity_cache.get(cache_key)
+                if affinity is None:
+                    affinity = self._get_category_community_affinity(supplier_id, category_id)
+                    self._affinity_cache[cache_key] = affinity
+                score += affinity * 40  # 最高可加40分（相当于100销量），社区偏好作为重要信号
 
         return score
 
@@ -218,18 +248,12 @@ class SmartSelectionService:
                 cursor.execute(sql, params)
                 rows = cursor.fetchall()
 
-        # 集成销量预测模型数据
+        # 集成销量预测模型数据（使用缓存避免重复训练）
         forecast_map = {}
-        try:
-            from service.sales_forecast_service import get_forecast_service
-            forecast_result = get_forecast_service().batch_predict(
-                supplier_id=None, forecast_days=7
-            )
-            if forecast_result.get("code") == 200:
-                for p in forecast_result["data"]["productPredictions"]:
-                    forecast_map[p["productId"]] = p["forecastQuantity"]
-        except Exception:
-            pass
+        forecast_result = _get_cached_forecast(supplier_id=None, forecast_days=7)
+        if forecast_result.get("code") == 200:
+            for p in forecast_result["data"]["productPredictions"]:
+                forecast_map[p["productId"]] = p["forecastQuantity"]
 
         results = []
         for row in rows:
@@ -274,11 +298,11 @@ class SmartSelectionService:
         """构建排除团长已上架商品的条件"""
         if supplier_id is None:
             return "WHERE 1=1", []
-        # 找出团长已上架的商品ID列表，排除它们
+        # 使用 NOT EXISTS 替代 NOT IN 提升性能
         return """
-            WHERE p.id NOT IN (
-                SELECT id FROM py_product
-                WHERE supplierId = %s AND status = 1
+            WHERE NOT EXISTS (
+                SELECT 1 FROM py_product p2
+                WHERE p2.supplierId = %s AND p2.status = 1 AND p2.id = p.id
             )
         """, [supplier_id]
 
@@ -305,7 +329,7 @@ class SmartSelectionService:
         return "正常，持续观察"
 
     def _query_slow_moving(
-        self, supplier_id: Optional[int], days: int = 90
+        self, supplier_id: Optional[int], days: int = 90, limit: int = 0
     ) -> List[Dict[str, Any]]:
         """查询滞销商品"""
         now = datetime.now()
@@ -316,6 +340,11 @@ class SmartSelectionService:
         if supplier_id is not None:
             scope_sql = "AND p.supplierId = %s"
             params.append(supplier_id)
+
+        limit_sql = ""
+        if limit > 0:
+            limit_sql = "LIMIT %s"
+            params.append(limit)
 
         sql = f"""
             SELECT
@@ -341,6 +370,7 @@ class SmartSelectionService:
             WHERE p.status = 1
               {scope_sql}
             ORDER BY p.stock DESC
+            {limit_sql}
         """
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -394,12 +424,25 @@ class SmartSelectionService:
     # ── 补货优先级 ────────────────────────────────────────
 
     def _count_urgent_restock(self, supplier_id: Optional[int]) -> int:
-        """统计紧急补货商品数"""
-        products = self._query_restock_priorities(supplier_id)
-        return sum(1 for p in products if p.get("priorityLevel") == 1)
+        """统计紧急补货商品数（仅计数，轻量查询）"""
+        scope_sql = ""
+        params: List[Any] = []
+        if supplier_id is not None:
+            scope_sql = "AND p.supplierId = %s"
+            params.append(supplier_id)
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(f"""
+                        SELECT COUNT(*) AS cnt FROM py_product p
+                        WHERE p.status = 1 AND p.stock < 10 {scope_sql}
+                    """, params)
+                    return cursor.fetchone()["cnt"] or 0
+        except Exception:
+            return 0
 
     def _query_restock_priorities(
-        self, supplier_id: Optional[int], forecast_days: int = 7
+        self, supplier_id: Optional[int], forecast_days: int = 7, limit: int = 0
     ) -> List[Dict[str, Any]]:
         """查询补货优先级"""
         now = datetime.now()
@@ -410,6 +453,11 @@ class SmartSelectionService:
         if supplier_id is not None:
             scope_sql = "AND p.supplierId = %s"
             params.append(supplier_id)
+
+        limit_sql = ""
+        if limit > 0:
+            limit_sql = "LIMIT %s"
+            params.append(limit)
 
         sql = f"""
             SELECT
@@ -436,6 +484,7 @@ class SmartSelectionService:
             WHERE p.status = 1
               {scope_sql}
             ORDER BY p.sales DESC
+            {limit_sql}
         """
         with get_db_connection() as conn:
             with conn.cursor() as cursor:
@@ -479,7 +528,7 @@ class SmartSelectionService:
         self, sellable_days: float, week_sales: float, daily_avg: float
     ) -> Tuple[int, str]:
         """计算补货优先级"""
-        if sellable_days < self.RESTOCK_URGENT_DAYS and week_sales > 0:
+        if sellable_days < self.RESTOCK_URGENT_DAYS and (week_sales > 0 or daily_avg > 0):
             return 1, "紧急"
         if sellable_days < self.RESTOCK_HIGH_DAYS and daily_avg > 0:
             return 2, "较高"
@@ -500,9 +549,29 @@ class SmartSelectionService:
     # ── 季节性推荐 ────────────────────────────────────────
 
     def _count_seasonal_candidates(self, supplier_id: Optional[int]) -> int:
-        """统计季节选品推荐数量"""
-        products = self._query_seasonal_products(supplier_id)
-        return len(products)
+        """统计季节选品推荐数量（仅计数，轻量查询）"""
+        current_month = datetime.now().month
+        exclusion_sql = ""
+        params: List[Any] = [current_month]
+        if supplier_id is not None:
+            exclusion_sql = "AND NOT EXISTS (SELECT 1 FROM py_product p2 WHERE p2.supplierId = %s AND p2.status = 1 AND p2.id = p.id)"
+            params.append(supplier_id)
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(f"""
+                        SELECT COUNT(DISTINCT p.id) AS cnt
+                        FROM py_product p
+                        JOIN py_order_item oi ON oi.productId = p.id
+                        JOIN py_order o ON oi.orderId = o.id
+                        WHERE o.status IN ('paid','shipped','delivered','completed')
+                          AND MONTH(STR_TO_DATE(o.createTime, '%%Y-%%m-%%d %%H:%%i:%%s')) = %s
+                          AND p.status = 1
+                          {exclusion_sql}
+                    """, params)
+                    return cursor.fetchone()["cnt"] or 0
+        except Exception:
+            return 0
 
     def _query_seasonal_products(
         self, supplier_id: Optional[int], limit: int = 20
@@ -514,9 +583,9 @@ class SmartSelectionService:
         params: List[Any] = [current_month]
         if supplier_id is not None:
             exclusion_sql = (
-                "AND p.id NOT IN ("
-                "  SELECT id FROM py_product"
-                "  WHERE supplierId = %s AND status = 1"
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM py_product p2"
+                "  WHERE p2.supplierId = %s AND p2.status = 1 AND p2.id = p.id"
                 ")"
             )
             params.append(supplier_id)
@@ -634,11 +703,15 @@ class SmartSelectionService:
     # ── 库存健康度 ─────────────────────────────────────────
 
     def _compute_inventory_health(
-        self, supplier_id: Optional[int]
+        self, supplier_id: Optional[int],
+        slow: Optional[List[Dict[str, Any]]] = None,
+        restock: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """计算库存健康度分布"""
-        slow = self._query_slow_moving(supplier_id)
-        restock = self._query_restock_priorities(supplier_id)
+        """计算库存健康度分布（复用外部已查询的数据避免重复查询）"""
+        if slow is None:
+            slow = self._query_slow_moving(supplier_id)
+        if restock is None:
+            restock = self._query_restock_priorities(supplier_id)
 
         total_on_shelf = 0
         if supplier_id is not None:
@@ -651,10 +724,11 @@ class SmartSelectionService:
                     total_on_shelf = cursor.fetchone()["cnt"] or 0
 
         overstocked = sum(1 for p in slow if p.get("riskLevel") == "high")
-        normal = max(0, total_on_shelf - overstocked - len(restock))
+        understocked = sum(1 for p in restock if p.get("priorityLevel", 99) <= 2)
+        normal = max(0, total_on_shelf - overstocked - understocked)
         return {
             "totalOnShelf": total_on_shelf,
             "healthy": normal,
             "overstocked": overstocked,
-            "understocked": sum(1 for p in restock if p.get("priorityLevel", 99) <= 2),
+            "understocked": understocked,
         }

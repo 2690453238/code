@@ -111,7 +111,8 @@ def get_product_recommendations(product_id):
     """获取关联商品推荐"""
     try:
         limit = request.args.get('limit', 6, type=int)
-        return jsonify(product_service.get_related_recommendations(product_id, limit))
+        current_user = get_current_user()
+        return jsonify(product_service.get_related_recommendations(product_id, limit, user_info=current_user))
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)})
 

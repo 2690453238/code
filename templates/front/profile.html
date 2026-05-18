@@ -181,6 +181,12 @@
                         <div class="side-nav-item" :class="{active: activeTab==='addresses'}" @click="switchTab('addresses')">
                             <i class="el-icon-location"></i> 收货地址
                         </div>
+                        <div class="side-nav-item" :class="{active: activeTab==='complaints'}" @click="switchTab('complaints')">
+                            <i class="el-icon-warning"></i> 投诉记录
+                        </div>
+                        <div class="side-nav-item" :class="{active: activeTab==='refunds'}" @click="switchTab('refunds')">
+                            <i class="el-icon-document"></i> 退款记录
+                        </div>
                     </div>
                 </div>
 
@@ -324,6 +330,117 @@
                         </div>
                     </div>
 
+                    <!-- 投诉记录 -->
+                    <div class="content-section" :class="{active: activeTab==='complaints'}">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div class="panel-title"><i class="el-icon-warning"></i>投诉记录</div>
+                            </div>
+                            <div class="panel-body">
+                                <!-- 状态筛选 -->
+                                <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+                                    <el-button :type="complaintFilter.status === '' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='';loadComplaints()">全部</el-button>
+                                    <el-button :type="complaintFilter.status === 'pending' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='pending';loadComplaints()">待处理</el-button>
+                                    <el-button :type="complaintFilter.status === 'processing' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='processing';loadComplaints()">处理中</el-button>
+                                    <el-button :type="complaintFilter.status === 'resolved' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='resolved';loadComplaints()">已解决</el-button>
+                                    <el-button :type="complaintFilter.status === 'rejected' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='rejected';loadComplaints()">已驳回</el-button>
+                                    <el-button :type="complaintFilter.status === 'closed' ? 'warning' : 'default'" size="small" @click="complaintFilter.status='closed';loadComplaints()">已关闭</el-button>
+                                </div>
+                                <div v-loading="complaintsLoading">
+                                    <div v-if="complaints.length === 0" style="text-align:center;padding:40px 0;color:#b09090;">
+                                        <i class="el-icon-document" style="font-size:48px;display:block;margin-bottom:12px;"></i>
+                                        <p>暂无投诉记录</p>
+                                    </div>
+                                    <div v-else>
+                                        <div v-for="item in complaints" :key="item.id" style="border:1px solid #f0e0df;border-radius:10px;padding:16px;margin-bottom:12px;transition:box-shadow .2s;" @mouseover="$event.target.style.boxShadow='0 2px 12px rgba(192,57,43,0.08)'" @mouseout="$event.target.style.boxShadow='none'">
+                                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+                                                <div style="display:flex;align-items:center;gap:8px;">
+                                                    <span style="font-size:13px;color:#9e7070;">{{ item.complaintNo }}</span>
+                                                    <el-tag :type="statusTagType(item.status)" size="mini">{{ statusLabel(item.status) }}</el-tag>
+                                                    <el-tag v-if="item.type" size="mini" plain>{{ typeLabel(item.type) }}</el-tag>
+                                                </div>
+                                                <div style="font-size:12px;color:#b09090;">{{ item.createTime }}</div>
+                                            </div>
+                                            <div style="font-size:14px;font-weight:600;color:#1a0a08;margin-bottom:4px;">{{ item.title }}</div>
+                                            <div style="font-size:13px;color:#6b3535;line-height:1.6;margin-bottom:8px;">{{ item.content }}</div>
+                                            <div v-if="item.replyContent" style="background:#fdf5f5;border-radius:6px;padding:10px 14px;font-size:13px;color:#7d4040;margin-bottom:8px;">
+                                                <span style="font-weight:600;">回复：</span>{{ item.replyContent }}
+                                            </div>
+                                            <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                                                <el-button v-if="item.status === 'pending'" type="warning" size="mini" @click="closeComplaint(item.id)">撤销投诉</el-button>
+                                                <el-button v-if="item.status === 'resolved' && !item.rating" type="success" size="mini" @click="showRateDialog(item)">去评价</el-button>
+                                                <el-button v-if="['closed','rejected','resolved'].includes(item.status)" type="danger" size="mini" plain @click="deleteComplaint(item.id)">删除</el-button>
+                                            </div>
+                                        </div>
+                                        <div v-if="complaintTotal > 10" style="text-align:center;margin-top:16px;">
+                                            <el-pagination background small
+                                                @current-change="complaintPage = $event; loadComplaints()"
+                                                :current-page="complaintPage"
+                                                :page-size="10"
+                                                :total="complaintTotal">
+                                            </el-pagination>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 退款记录 -->
+                    <div class="content-section" :class="{active: activeTab==='refunds'}">
+                        <div class="panel">
+                            <div class="panel-head">
+                                <div class="panel-title"><i class="el-icon-document"></i>退款记录</div>
+                            </div>
+                            <div class="panel-body">
+                                <div style="display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap;">
+                                    <el-button :type="refundFilter.status === '' ? 'warning' : 'default'" size="small" @click="refundFilter.status='';loadRefunds()">全部</el-button>
+                                    <el-button :type="refundFilter.status === 'pending' ? 'warning' : 'default'" size="small" @click="refundFilter.status='pending';loadRefunds()">待审核</el-button>
+                                    <el-button :type="refundFilter.status === 'approved' ? 'warning' : 'default'" size="small" @click="refundFilter.status='approved';loadRefunds()">已通过</el-button>
+                                    <el-button :type="refundFilter.status === 'rejected' ? 'warning' : 'default'" size="small" @click="refundFilter.status='rejected';loadRefunds()">已拒绝</el-button>
+                                    <el-button :type="refundFilter.status === 'cancelled' ? 'warning' : 'default'" size="small" @click="refundFilter.status='cancelled';loadRefunds()">已撤销</el-button>
+                                </div>
+                                <div v-loading="refundsLoading">
+                                    <div v-if="refunds.length === 0" style="text-align:center;padding:40px 0;color:#b09090;">
+                                        <i class="el-icon-document" style="font-size:48px;display:block;margin-bottom:12px;"></i>
+                                        <p>暂无退款记录</p>
+                                    </div>
+                                    <div v-else>
+                                        <div v-for="item in refunds" :key="item.id" style="border:1px solid #f0e0df;border-radius:10px;padding:16px;margin-bottom:12px;">
+                                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px;">
+                                                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                                                    <span style="font-size:13px;color:#9e7070;">{{ item.refundNo }}</span>
+                                                    <el-tag :type="refundTagType(item.status)" size="mini">{{ refundStatusLabel(item.status) }}</el-tag>
+                                                    <el-tag v-if="item.type" size="mini" plain>{{ item.type === 'return_refund' ? '退货退款' : '仅退款' }}</el-tag>
+                                                </div>
+                                                <div style="font-size:12px;color:#b09090;">{{ item.createTime }}</div>
+                                            </div>
+                                            <div style="font-size:13px;color:#6b3535;margin-bottom:4px;">
+                                                <span style="color:#9e7070;">退款金额：</span><span style="color:#e8a81a;font-weight:700;">¥{{ item.amount }}</span>
+                                                <span style="margin-left:16px;color:#9e7070;">原因：</span>{{ item.reason }}
+                                            </div>
+                                            <div v-if="item.description" style="font-size:12px;color:#b09090;margin-bottom:4px;">{{ item.description }}</div>
+                                            <div v-if="item.adminReply" style="background:#fdf5f5;border-radius:6px;padding:8px 12px;font-size:13px;color:#7d4040;margin-top:6px;">
+                                                <span style="font-weight:600;">回复：</span>{{ item.adminReply }}
+                                            </div>
+                                            <div v-if="item.status === 'pending'" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+                                                <el-button type="warning" size="mini" @click="cancelRefund(item.id)">撤销申请</el-button>
+                                            </div>
+                                        </div>
+                                        <div v-if="refundTotal > 10" style="text-align:center;margin-top:16px;">
+                                            <el-pagination background small
+                                                @current-change="refundPage = $event; loadRefunds()"
+                                                :current-page="refundPage"
+                                                :page-size="10"
+                                                :total="refundTotal">
+                                            </el-pagination>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -360,6 +477,19 @@
             <el-button type="primary" @click="saveAddress" :loading="addressDialog.loading">保存</el-button>
         </div>
     </el-dialog>
+
+    <!-- 投诉评价对话框 -->
+    <el-dialog title="评价投诉处理" :visible.sync="rateDialogVisible" width="420px">
+        <div style="text-align:center;padding:10px 0;">
+            <div style="font-size:14px;color:#7d4040;margin-bottom:16px;">请对本次投诉处理进行评价</div>
+            <el-rate v-model="rateForm.rating" :colors="['#e8a81a','#e8a81a','#e8a81a']" style="margin-bottom:16px;" show-text :texts="['不满意','一般','满意','很满意','非常满意']"></el-rate>
+            <el-input v-model="rateForm.comment" type="textarea" :rows="3" placeholder="补充评价（选填）" maxlength="200" show-word-limit></el-input>
+        </div>
+        <div slot="footer">
+            <el-button @click="rateDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="submitRate" :loading="rateSubmitting">提交评价</el-button>
+        </div>
+    </el-dialog>
 </div>
 
 <script src="/static/js/vue.js"></script>
@@ -388,6 +518,20 @@ new Vue({
             cascaderProps: { value: 'code', label: 'name', children: 'children' },
             profileForm: { username: '', nickname: '', email: '', phone: '', sex: '', age: null, birthday: '', education: '', profession: '', company: '', address: '', content: '' },
             passwordForm: { oldPassword: '', newPassword: '', confirmPassword: '' },
+            complaints: [],
+            complaintsLoading: false,
+            complaintFilter: { status: '' },
+            complaintPage: 1,
+            complaintTotal: 0,
+            rateDialogVisible: false,
+            rateSubmitting: false,
+            rateForm: { rating: 5, comment: '' },
+            rateTargetId: null,
+            refunds: [],
+            refundsLoading: false,
+            refundFilter: { status: '' },
+            refundPage: 1,
+            refundTotal: 0,
             profileRules: {
                 nickname: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
                 email: [{ type: 'email', message: '请输入正确的邮箱地址', trigger: 'blur' }],
@@ -414,6 +558,8 @@ new Vue({
         switchTab(name) {
             this.activeTab = name;
             if (name === 'addresses') this.loadAddresses();
+            if (name === 'complaints') { this.complaintPage = 1; this.loadComplaints(); }
+            if (name === 'refunds') { this.refundPage = 1; this.loadRefunds(); }
         },
         loadUserInfo() {
             axios.get('/api/user/profile').then(res => {
@@ -551,6 +697,100 @@ new Vue({
                 if (res.data.code === 200) { this.$message.success('删除地址成功'); this.loadAddresses(); }
                 else this.$message.error(res.data.message);
             } catch(e) { if (e !== 'cancel') this.$message.error('删除失败'); }
+        },
+        // 投诉相关
+        async loadComplaints() {
+            this.complaintsLoading = true;
+            try {
+                const params = { page: this.complaintPage, limit: 10 };
+                if (this.complaintFilter.status) params.status = this.complaintFilter.status;
+                const res = await axios.get('/api/complaint/my-list', { params });
+                if (res.data.code === 200) {
+                    this.complaints = res.data.data.rows || [];
+                    this.complaintTotal = res.data.data.total || 0;
+                } else {
+                    this.$message.error(res.data.message);
+                }
+            } catch(e) { this.$message.error('加载投诉记录失败'); }
+            finally { this.complaintsLoading = false; }
+        },
+        statusTagType(status) {
+            const map = { pending: 'warning', processing: 'primary', resolved: 'success', rejected: 'danger', closed: 'info' };
+            return map[status] || 'info';
+        },
+        statusLabel(status) {
+            const map = { pending: '待处理', processing: '处理中', resolved: '已解决', rejected: '已驳回', closed: '已关闭' };
+            return map[status] || status;
+        },
+        typeLabel(type) {
+            const map = { order: '订单问题', product: '商品问题', service: '服务问题', platform: '平台问题', other: '其他' };
+            return map[type] || type;
+        },
+        async closeComplaint(id) {
+            try {
+                await this.$confirm('确定要撤销这个投诉吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' });
+                const res = await axios.post('/api/complaint/close', { id });
+                if (res.data.code === 200) { this.$message.success(res.data.message); this.loadComplaints(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { if (e !== 'cancel') this.$message.error('撤销失败'); }
+        },
+        async deleteComplaint(id) {
+            try {
+                await this.$confirm('确定要删除这个投诉记录吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' });
+                const res = await axios.delete(`/api/complaint/delete?id=${id}`);
+                if (res.data.code === 200) { this.$message.success(res.data.message); this.loadComplaints(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { if (e !== 'cancel') this.$message.error('删除失败'); }
+        },
+        showRateDialog(item) {
+            this.rateTargetId = item.id;
+            this.rateForm = { rating: 5, comment: '' };
+            this.rateDialogVisible = true;
+        },
+        async submitRate() {
+            this.rateSubmitting = true;
+            try {
+                const res = await axios.post('/api/complaint/rate', {
+                    id: this.rateTargetId,
+                    rating: this.rateForm.rating,
+                    ratingComment: this.rateForm.comment
+                });
+                if (res.data.code === 200) { this.$message.success(res.data.message); this.rateDialogVisible = false; this.loadComplaints(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { this.$message.error('评价失败'); }
+            finally { this.rateSubmitting = false; }
+        },
+        // 退款相关
+        async loadRefunds() {
+            this.refundsLoading = true;
+            try {
+                const params = { page: this.refundPage, limit: 10 };
+                if (this.refundFilter.status) params.status = this.refundFilter.status;
+                const res = await axios.get('/api/mall/refund/my-list', { params });
+                if (res.data.code === 200) {
+                    this.refunds = res.data.data.rows || [];
+                    this.refundTotal = res.data.data.total || 0;
+                } else {
+                    this.$message.error(res.data.message);
+                }
+            } catch(e) { this.$message.error('加载退款记录失败'); }
+            finally { this.refundsLoading = false; }
+        },
+        refundTagType(status) {
+            const map = { pending: 'warning', approved: 'success', rejected: 'danger', cancelled: 'info' };
+            return map[status] || 'info';
+        },
+        refundStatusLabel(status) {
+            const map = { pending: '待审核', approved: '已通过', rejected: '已拒绝', cancelled: '已撤销' };
+            return map[status] || status;
+        },
+        async cancelRefund(id) {
+            try {
+                await this.$confirm('确定要撤销这个退款申请吗？', '提示', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' });
+                const res = await axios.post('/api/mall/refund/cancel', { id });
+                if (res.data.code === 200) { this.$message.success(res.data.message); this.loadRefunds(); }
+                else this.$message.error(res.data.message);
+            } catch(e) { if (e !== 'cancel') this.$message.error('撤销失败'); }
         }
     }
 });

@@ -441,6 +441,11 @@ new Vue({
     },
     mounted() {
         this.checkAuth();
+        if (this.userInfo.role && this.userInfo.role !== 'user') {
+            this.$message.warning('仅普通用户可访问购物车');
+            window.location.href = '/front/mall/mall.html';
+            return;
+        }
         this.loadCart();
     },
     methods: {
