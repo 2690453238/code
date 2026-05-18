@@ -73,6 +73,12 @@ class AuthService:
                 logger.warning(f"用户名 {username} 已存在")
                 return False
 
+            # 从 py_community 获取社区名称
+            if supplier_code:
+                comm = execute_query("SELECT communityName FROM py_community WHERE communityCode = %s AND status = 'active'", (supplier_code,))
+                if comm:
+                    supplier_name = comm[0]['communityName']
+
             current_time = time.strftime('%Y-%m-%d %H:%M:%S')
             insert_sql = """
                 INSERT INTO py_user
@@ -96,10 +102,10 @@ class AuthService:
         """获取所有社区选项"""
         try:
             sql = """
-                SELECT DISTINCT supplierCode, supplierName
-                FROM py_user
-                WHERE supplierCode IS NOT NULL AND supplierCode != ''
-                ORDER BY supplierCode
+                SELECT communityCode AS supplierCode, communityName AS supplierName
+                FROM py_community
+                WHERE status = 'active'
+                ORDER BY communityCode
             """
             return execute_query(sql) or []
         except Exception as e:

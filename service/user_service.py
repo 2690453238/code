@@ -249,10 +249,10 @@ class UserService:
         """获取所有社区选项（用于下拉选择）"""
         try:
             sql = """
-                SELECT DISTINCT supplierCode, supplierName
-                FROM py_user
-                WHERE supplierCode IS NOT NULL AND supplierCode != ''
-                ORDER BY supplierCode
+                SELECT communityCode AS supplierCode, communityName AS supplierName
+                FROM py_community
+                WHERE status = 'active'
+                ORDER BY communityCode
             """
             return execute_query(sql) or []
         except Exception as e:

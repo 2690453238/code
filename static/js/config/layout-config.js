@@ -122,14 +122,7 @@ const LayoutConfig = {
             icon: 'el-icon-data-analysis',
             roles: ['platform_operator']
         },
-        {
-            index: 'visual-analysis',
-            title: '可视化分析',
-            path: '/admin/operation-report.html',
-            icon: 'el-icon-pie-chart',
-            roles: ['platform_operator']
-        },
-        {
+{
             index: 'announcements',
             title: '消息公告',
             path: '/admin/announcements.html',

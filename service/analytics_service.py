@@ -542,7 +542,7 @@ class AnalyticsService:
                              'avgPrice': float(r['avgPrice']),
                              'minPrice': float(r['minPrice']),
                              'maxPrice': float(r['maxPrice']),
-                             'totalSales': r['totalSales']}
+                             'totalSales': float(r['totalSales']) if r['totalSales'] is not None else 0}
                             for r in category_dist
                         ],
                         'priceRanges': [
@@ -551,7 +551,8 @@ class AnalyticsService:
                         ],
                         'bubbleData': [
                             {'name': r['name'], 'price': float(r['price']),
-                             'sales': r['sales'], 'stock': r['stock'],
+                             'sales': float(r['sales']) if r['sales'] is not None else 0,
+                             'stock': int(r['stock']) if r['stock'] is not None else 0,
                              'category': r['category']}
                             for r in bubble_data
                         ]
@@ -590,15 +591,18 @@ class AnalyticsService:
                     """)
                     category_ratings = cursor.fetchall()
 
-                    # 3. 评价词条TOP标签（来自 py_product_review_tags）
-                    cursor.execute("""
-                        SELECT tagName, tagCategory, SUM(tagCount) AS total
-                        FROM py_product_review_tags
-                        GROUP BY tagName, tagCategory
-                        ORDER BY total DESC
-                        LIMIT 30
-                    """)
-                    tag_rows = cursor.fetchall()
+                    # 3. 评价词条TOP标签（来自 py_product_review_tags，表不存在时返回空）
+                    try:
+                        cursor.execute("""
+                            SELECT tagName, tagCategory, SUM(tagCount) AS total
+                            FROM py_product_review_tags
+                            GROUP BY tagName, tagCategory
+                            ORDER BY total DESC
+                            LIMIT 30
+                        """)
+                        tag_rows = cursor.fetchall()
+                    except Exception:
+                        tag_rows = []
 
                     # 4. 月度评价趋势（近6个月）
                     cursor.execute("""

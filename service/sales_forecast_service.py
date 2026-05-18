@@ -198,7 +198,7 @@ class SalesForecastService:
         dataset = self._append_time_features(dataset)
         dataset = self._append_lag_features(dataset)
         # 前14天无法构造滞后特征，丢弃；但保留真实销量>0的行（即使滞后特征为NaN也保留）
-        dataset = dataset.dropna(subset=["lag_1", "lag_7", "rolling_mean_7"], thresh=2).reset_index(drop=True)
+        dataset = dataset.dropna(subset=["lag_1", "lag_7", "rolling_mean_7"], thresh=1).reset_index(drop=True)
         # 填充剩余的NaN
         numeric_cols = dataset.select_dtypes(include=[np.number]).columns
         dataset[numeric_cols] = dataset[numeric_cols].fillna(0)
@@ -382,10 +382,12 @@ class SalesForecastService:
     ) -> Optional[Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, List[str], List[str]]]:
         """按时间划分训练集与测试集"""
         dates = sorted(dataset["sale_date"].dt.strftime("%Y-%m-%d").unique().tolist())
-        if len(dates) <= max(10, test_days):
+        if len(dates) < 5:
             return None
 
-        effective_test_days = max(7, min(test_days, len(dates) // 3))
+        effective_test_days = max(2, min(test_days, len(dates) // 3))
+        if len(dates) <= effective_test_days + 1:
+            effective_test_days = max(1, len(dates) - 3)
         split_dates = dates[-effective_test_days:]
         feature_cols = self._get_feature_columns()
         train_mask = ~dataset["sale_date"].dt.strftime("%Y-%m-%d").isin(split_dates)
@@ -494,8 +496,15 @@ class SalesForecastService:
             train_result = self.train_model(supplier_id, forecast_days, test_days)
             if train_result["code"] != 200:
                 return train_result
-        with open(path, "rb") as file_obj:
-            artifact = pickle.load(file_obj)
+        try:
+            with open(path, "rb") as file_obj:
+                artifact = pickle.load(file_obj)
+        except Exception:
+            train_result = self.train_model(supplier_id, forecast_days, test_days)
+            if train_result["code"] != 200:
+                return train_result
+            with open(path, "rb") as file_obj:
+                artifact = pickle.load(file_obj)
         if sorted(artifact.get("featureColumns", [])) != sorted(self._get_feature_columns()):
             train_result = self.train_model(supplier_id, forecast_days, test_days)
             if train_result["code"] != 200:
@@ -523,10 +532,13 @@ class SalesForecastService:
         # 2. 磁盘缓存（避免进程重启后重新计算）
         disk_path = self._prediction_cache_path(cache_key)
         if os.path.exists(disk_path):
-            with open(disk_path, "rb") as f:
-                predictions = pickle.load(f)
-            self._prediction_cache[cache_key] = predictions.copy()
-            return predictions
+            try:
+                with open(disk_path, "rb") as f:
+                    predictions = pickle.load(f)
+                self._prediction_cache[cache_key] = predictions.copy()
+                return predictions
+            except Exception:
+                pass
 
         # 3. 从零计算
         predictions = self._forecast_future(artifact, forecast_days)
@@ -547,7 +559,7 @@ class SalesForecastService:
         return os.path.join(ARTIFACT_DIR, f"pred_{safe_key}.pkl")
 
     def _forecast_future(self, artifact: Dict[str, Any], forecast_days: int) -> pd.DataFrame:
-        """递归预测未来销量"""
+        """递归预测未来销量（全量批量预测优化版）"""
         model: RandomForestRegressor = artifact["model"]
         history = artifact["history"].copy()
         history["sale_date"] = pd.to_datetime(history["sale_date"])
@@ -555,7 +567,7 @@ class SalesForecastService:
         forecast_start_date = self._get_forecast_start_date()
         future_dates = pd.date_range(forecast_start_date, periods=forecast_days, freq="D")
 
-        result_frames: List[pd.DataFrame] = []
+        all_feature_rows: List[Dict[str, Any]] = []
         for _, product_frame in history.groupby("product_id", sort=False):
             product_history = self._prepare_product_history(product_frame, forecast_start_date)
             bridge_dates = pd.date_range(
@@ -563,21 +575,23 @@ class SalesForecastService:
                 forecast_start_date - pd.Timedelta(days=1),
                 freq="D",
             )
-            for bridge_date in bridge_dates:
-                next_row = self._build_future_row(product_history, bridge_date)
-                feature_frame = pd.DataFrame([next_row])[feature_cols]
-                raw_pred = float(model.predict(feature_frame)[0])
-                next_row["predicted_quantity"] = max(raw_pred, 0.0)
+            all_dates = list(bridge_dates) + list(future_dates)
+            for dt in all_dates:
+                next_row = self._build_future_row(product_history, dt)
+                all_feature_rows.append(next_row)
                 product_history = pd.concat([product_history, pd.DataFrame([next_row])], ignore_index=True)
-            for future_date in future_dates:
-                next_row = self._build_future_row(product_history, future_date)
-                feature_frame = pd.DataFrame([next_row])[feature_cols]
-                raw_pred = float(model.predict(feature_frame)[0])
-                next_row["predicted_quantity"] = max(raw_pred, 0.0)
-                product_history = pd.concat([product_history, pd.DataFrame([next_row])], ignore_index=True)
-            future_frame = product_history[product_history["sale_date"].isin(future_dates)].copy()
-            result_frames.append(future_frame)
-        return pd.concat(result_frames, ignore_index=True) if result_frames else pd.DataFrame()
+
+        if not all_feature_rows:
+            return pd.DataFrame()
+
+        # 所有商品、所有日期统一批量预测（一次调用 model.predict）
+        full_feature_df = pd.DataFrame(all_feature_rows)
+        preds = model.predict(full_feature_df[feature_cols])
+        for i, row in enumerate(all_feature_rows):
+            row["predicted_quantity"] = max(float(preds[i]), 0.0)
+
+        full_df = pd.DataFrame(all_feature_rows)
+        return full_df[full_df["sale_date"].isin(future_dates)]
 
     def _to_quantity(self, value: float) -> int:
         """转换为非负销量件数"""

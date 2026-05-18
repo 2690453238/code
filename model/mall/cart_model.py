@@ -27,10 +27,14 @@ class CartModel:
             cursor.execute(sql, (user_id,))
             result = cursor.fetchall()
             
-            # 为了兼容前端，添加 skuName 字段（设为空字符串）
+            # 转换Decimal类型为float，避免JSON序列化异常
             for item in result:
                 item['skuName'] = ''
-            
+                if item.get('price') is not None:
+                    item['price'] = float(item['price'])
+                if item.get('skuStock') is not None:
+                    item['skuStock'] = int(item['skuStock'])
+
             return result
     
     def add_to_cart(self, user_id: int, product_id: int, sku_id: int, quantity: int, price: float) -> bool:

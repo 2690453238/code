@@ -22,7 +22,8 @@ class ProductService(BaseProductService):
             from utils.db_utils import execute_query
             leaders = execute_query("""
                 SELECT cl.id FROM py_user u
-                JOIN py_user cl ON u.supplierCode = cl.supplierCode
+                JOIN py_community c ON u.supplierCode = c.communityCode
+                JOIN py_user cl ON c.leaderUserId = cl.id
                 WHERE u.id = %s AND u.role = 'user' AND cl.role = 'community_leader'
             """, (user_id,))
             return leaders[0]['id'] if leaders else None
