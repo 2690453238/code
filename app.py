@@ -1,9 +1,25 @@
 from flask import Flask, send_from_directory, request, redirect, url_for, session
+import json
 import os
+from datetime import datetime, date
+from decimal import Decimal
 from config.config import *
 
 # 创建Flask应用
 app = Flask(__name__)
+
+# 全局JSON编码器：处理Decimal类型
+class CustomJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, datetime):
+            return obj.strftime('%Y-%m-%d %H:%M:%S')
+        if isinstance(obj, date):
+            return obj.strftime('%Y-%m-%d')
+        return super().default(obj)
+
+app.json_encoder = CustomJSONEncoder
 
 # 配置应用
 app.config.from_object('config.config')

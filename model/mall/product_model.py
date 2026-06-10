@@ -75,17 +75,17 @@ class ProductModel:
             
             # 转换Decimal类型为float，避免JSON序列化错误
             for row in rows:
-                if row.get('price'):
+                if row.get('price') is not None:
                     row['price'] = float(row['price'])
-                if row.get('originalPrice'):
+                if row.get('originalPrice') is not None:
                     row['originalPrice'] = float(row['originalPrice'])
                 if row.get('discountRate') is not None:
                     row['discountRate'] = float(row['discountRate'])
                 # 转换datetime类型为字符串，避免JSON序列化错误
-                if row.get('createTime'):
-                    row['createTime'] = row['createTime'].strftime('%Y-%m-%d %H:%M:%S') if row['createTime'] else None
-                if row.get('updateTime'):
-                    row['updateTime'] = row['updateTime'].strftime('%Y-%m-%d %H:%M:%S') if row['updateTime'] else None
+                if row.get('createTime') is not None:
+                    row['createTime'] = row['createTime'].strftime('%Y-%m-%d %H:%M:%S')
+                if row.get('updateTime') is not None:
+                    row['updateTime'] = row['updateTime'].strftime('%Y-%m-%d %H:%M:%S')
             
             return {
                 'total': total,
@@ -114,17 +114,17 @@ class ProductModel:
             result = cursor.fetchone()
             if result:
                 # 转换Decimal类型为float，避免JSON序列化错误
-                if result.get('price'):
+                if result.get('price') is not None:
                     result['price'] = float(result['price'])
-                if result.get('originalPrice'):
+                if result.get('originalPrice') is not None:
                     result['originalPrice'] = float(result['originalPrice'])
                 if result.get('discountRate') is not None:
                     result['discountRate'] = float(result['discountRate'])
                 # 转换datetime类型为字符串，避免JSON序列化错误
-                if result.get('createTime'):
-                    result['createTime'] = result['createTime'].strftime('%Y-%m-%d %H:%M:%S') if result['createTime'] else None
-                if result.get('updateTime'):
-                    result['updateTime'] = result['updateTime'].strftime('%Y-%m-%d %H:%M:%S') if result['updateTime'] else None
+                if result.get('createTime') is not None:
+                    result['createTime'] = result['createTime'].strftime('%Y-%m-%d %H:%M:%S')
+                if result.get('updateTime') is not None:
+                    result['updateTime'] = result['updateTime'].strftime('%Y-%m-%d %H:%M:%S')
             return result
     
     def create_product(self, product_data: Dict) -> int:

@@ -63,13 +63,14 @@ def get_dashboard():
 @smart_selection_bp.route("/new-products", methods=["GET"])
 @login_required
 def get_new_products():
+    """商品推荐列表（基于销量预测数据排序）"""
     return _execute(
         _has_community_permission,
         lambda: service.get_new_products(
             _resolve_supplier_id(),
             request.args.get("limit", 50, type=int),
         ),
-        "获取新品推荐失败",
+        "获取商品推荐失败",
     )
 
 

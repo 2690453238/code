@@ -13,12 +13,29 @@ class ProductService:
     VALID_ORDER_STATUS: Tuple[str, ...] = ('paid', 'shipped', 'delivered', 'completed')
     
     def __init__(self):
+        self.db = None
+        self.product_model = None
+
+    def _ensure_db(self):
+        """确保数据库连接有效，如连接过期则自动重连"""
+        try:
+            if self.db is not None:
+                self.db.ping(reconnect=True)
+                return
+        except:
+            pass
+        try:
+            if self.db is not None:
+                self.db.close()
+        except:
+            pass
         self.db = get_db_connection()
         self.product_model = ProductModel(self.db)
-    
+
     def get_products(self, category_id: int = None, status: int = None, page: int = 1, limit: int = 10, keyword: str = None, sort_type: str = 'default') -> Dict:
         """获取商品列表"""
         try:
+            self._ensure_db()
             result = self.product_model.get_products(category_id, status, page, limit, keyword, sort_type)
             return page_response(result['rows'], result['total'], result['page'], result['limit'])
         except Exception as e:
@@ -28,6 +45,7 @@ class ProductService:
     def get_product_by_id(self, product_id: int) -> Dict:
         """根据ID获取商品详情"""
         try:
+            self._ensure_db()
             product = self.product_model.get_product_by_id(product_id)
             if not product:
                 return error("商品不存在")
@@ -53,6 +71,7 @@ class ProductService:
     def create_product(self, product_data: Dict) -> Dict:
         """创建商品"""
         try:
+            self._ensure_db()
             # 验证必填字段
             required_fields = ['name', 'categoryId', 'price']
             for field in required_fields:
@@ -68,6 +87,7 @@ class ProductService:
     def update_product(self, product_id: int, product_data: Dict) -> Dict:
         """更新商品"""
         try:
+            self._ensure_db()
             result = self.product_model.update_product(product_id, product_data)
             if result:
                 return success(None, "商品更新成功")
@@ -80,6 +100,7 @@ class ProductService:
     def delete_product(self, product_id: int) -> Dict:
         """删除商品"""
         try:
+            self._ensure_db()
             result = self.product_model.delete_product(product_id)
             if result:
                 return success(None, "商品删除成功")
@@ -92,6 +113,7 @@ class ProductService:
     def get_hot_products(self, limit: int = 10) -> Dict:
         """获取热门商品"""
         try:
+            self._ensure_db()
             result = self.product_model.get_products(status=1, limit=limit)
             # 过滤热门商品
             hot_products = [p for p in result['rows'] if p.get('isHot') == 1]
@@ -103,6 +125,7 @@ class ProductService:
     def get_new_products(self, limit: int = 10) -> Dict:
         """获取新品商品"""
         try:
+            self._ensure_db()
             result = self.product_model.get_products(status=1, limit=limit)
             # 过滤新品商品
             new_products = [p for p in result['rows'] if p.get('isNew') == 1]
@@ -114,6 +137,7 @@ class ProductService:
     def update_product_status(self, product_id: int, status: int) -> Dict:
         """更新商品状态"""
         try:
+            self._ensure_db()
             result = self.product_model.update_product_status(product_id, status)
             if result:
                 status_text = "上架" if status == 1 else "下架"
@@ -127,6 +151,7 @@ class ProductService:
     def batch_delete_products(self, product_ids: List[int]) -> Dict:
         """批量删除商品"""
         try:
+            self._ensure_db()
             result = self.product_model.batch_delete_products(product_ids)
             if result:
                 return success(None, f"成功删除{len(product_ids)}个商品")
@@ -255,6 +280,7 @@ class ProductService:
     def get_related_recommendations(self, product_id: int, limit: int = 6) -> Dict[str, Any]:
         """获取关联商品推荐"""
         try:
+            self._ensure_db()
             product = self.product_model.get_product_by_id(product_id)
             if not product:
                 return error("商品不存在")

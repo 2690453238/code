@@ -65,7 +65,7 @@
                     </div>
                     <div class="form-help">
                         <span>预测天数：从今天起向后预测的天数，影响图表和商品预测汇总。</span>
-                        <span>评估天数：从历史末尾划出多少天做测试集，影响 RMSE、MAE、MAPE、R²。</span>
+                        <span>评估天数：从历史末尾划出多少天做测试集，影响 RMSE、MAE、R²。</span>
                         <span>训练模型：重新训练并保存模型；刷新结果：复用已保存模型和当日预测缓存重新展示。</span>
                     </div>
                 </div>
@@ -102,8 +102,8 @@
                         <el-card class="metric-card">
                             <div class="metric-box">
                                 <div class="metric-label">模型评估</div>
-                                <div class="metric-value">{{ dashboard.metrics.mape || 0 }}%</div>
-                                <div class="metric-sub">MAPE 越低越好</div>
+                                <div class="metric-value">{{ dashboard.metrics.mae || 0 }}</div>
+                                <div class="metric-sub">MAE 越低越好</div>
                             </div>
                         </el-card>
                     </el-col>
@@ -127,7 +127,6 @@
                             <ul class="metric-list">
                                 <li><span>RMSE</span><strong>{{ dashboard.metrics.rmse || 0 }}</strong></li>
                                 <li><span>MAE</span><strong>{{ dashboard.metrics.mae || 0 }}</strong></li>
-                                <li><span>MAPE</span><strong>{{ dashboard.metrics.mape || 0 }}%</strong></li>
                                 <li><span>R²</span><strong>{{ dashboard.metrics.r2 || 0 }}</strong></li>
                                 <li><span>训练区间</span><strong>{{ evaluation.trainDateRange.start || '-' }}</strong></li>
                                 <li><span>测试区间</span><strong>{{ evaluation.testDateRange.start || '-' }}</strong></li>
@@ -157,7 +156,7 @@
                         <div class="explain-block">
                             <div class="explain-title">模型指标</div>
                             <div class="explain-text">
-                                RMSE、MAE、MAPE 表示预测误差，数值越低越好；R² 越接近 1 说明拟合效果越好。
+                                RMSE、MAE 表示预测误差，数值越低越好；R² 越接近 1 说明拟合效果越好。
                             </div>
                         </div>
                         <div class="explain-block">

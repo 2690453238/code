@@ -610,7 +610,7 @@
                                 <div class="product-body">
                                     <div class="product-name" @click="viewProduct(product.id)">{{ product.name }}</div>
                                     <div class="price-row">
-                                        <div class="price-now"><span>¥</span>{{ product.discountRate ? (product.price * product.discountRate).toFixed(2) : product.price }}</div>
+                                        <div class="price-now"><span>¥</span>{{ product.discountRate ? (Number(product.price) * product.discountRate).toFixed(2) : Number(product.price).toFixed(2) }}</div>
                                     </div>
                                     <div class="card-actions">
                                         <button class="btn-cart" v-if="userInfo.role === 'user'" @click="addToCart(product)">

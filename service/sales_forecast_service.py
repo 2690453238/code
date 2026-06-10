@@ -1,4 +1,19 @@
-"""销量预测服务"""
+"""
+销量预测服务 —— 基于随机森林回归的商品销量预测引擎
+
+核心流程：
+  1. 从数据库拉取历史订单数据，按商品×日期展开为训练数据集
+  2. 构造 30 维特征（时间特征、滞后特征、滚动统计、促销特征等）
+  3. 训练 RandomForestRegressor（350棵树，最大深度7）进行回归预测
+  4. 递归预测策略：先预测第1天，将预测值作为滞后特征预测后续天数
+  5. 输出未来 N 天每个商品的预测销量、建议采购量、库存风险评估
+
+典型用法：
+    service = SalesForecastService()
+    result = service.train_model(supplier_id=5)           # 训练
+    result = service.batch_predict(supplier_id=5)          # 批量预测
+    result = service.get_dashboard(supplier_id=5)          # 看板数据
+"""
 from __future__ import annotations
 
 import os
@@ -15,27 +30,23 @@ from utils.db_utils import get_db_connection
 from utils.response import error, success
 
 
+# 有效的订单状态集合 —— 只有这些状态的订单才纳入销量统计
 VALID_ORDER_STATUS: Tuple[str, ...] = ("paid", "shipped", "delivered", "completed")
+# 模型持久化目录
 ARTIFACT_DIR: str = os.path.join("Predictive", "artifacts")
+# 安全库存系数：建议库存比预测销量多保留 15%
 SAFETY_STOCK_RATE: float = 0.15
+# 中国节假日集合（月-日格式），用于构造节假日特征
 CHINA_HOLIDAY_MMDD: Set[str] = {
-    "01-01",
-    "02-14",
-    "03-08",
-    "05-01",
-    "05-02",
-    "05-03",
-    "06-01",
-    "10-01",
-    "10-02",
-    "10-03",
-    "10-04",
-    "10-05",
-    "10-06",
-    "10-07",
-    "11-11",
-    "12-12",
-    "12-25",
+    "01-01",   # 元旦
+    "02-14",   # 情人节
+    "03-08",   # 妇女节
+    "05-01", "05-02", "05-03",  # 劳动节
+    "06-01",   # 儿童节
+    "10-01", "10-02", "10-03", "10-04", "10-05", "10-06", "10-07",  # 国庆节
+    "11-11",   # 双十一
+    "12-12",   # 双十二
+    "12-25",   # 圣诞节
 }
 
 
@@ -61,7 +72,53 @@ class SalesForecastService:
         forecast_days: int = 7,
         test_days: int = 14,
     ) -> Dict[str, Any]:
-        """训练销量预测模型"""
+        """
+        训练销量预测模型
+
+        完整流程说明：
+        ─────────────────────────────────────────────────────────
+        步骤① 构建训练数据集
+          - 调用 _fetch_product_frame() 获取全部上架商品的基础信息（价格、品类、折扣率等）
+          - 调用 _fetch_sales_frame() 获取历史订单的日销量明细
+          - 调用 _build_calendar_frame() 生成「商品×日期」的完整笛卡尔积（保证没有日期间隙）
+          - 将销量数据左连接到日历框架上，无销量的日期填充为 0
+          - 补齐商品静态特征（price、discount_rate 等）
+
+        步骤② 特征工程
+          - 时间特征：day_of_week、month、season、is_weekend、is_holiday
+          - 滞后特征：lag_1（昨日）、lag_3、lag_7、lag_14（14天前销量）
+          - 滚动窗口特征：rolling_mean_3/7/14、rolling_sum_14、rolling_max_7
+          - 周期特征：星期几历史均值（dow_avg）
+          - 促销特征：has_promotion、promotion_strength
+          - 品类辅助特征：cat_daily_avg（品类日均销量）
+          - 销售节奏特征：recent_sale_7d、days_since_sale（距上次销售天数）
+          - 共 30 维特征（具体见 _get_feature_columns()）
+
+        步骤③ 划分训练集/测试集
+          - 按时间顺序划分：最后 test_days 天作为测试集，之前的数据作为训练集
+          - 避免未来数据泄露（时间序列的严格切分）
+
+        步骤④ 训练随机森林回归模型
+          - 算法：RandomForestRegressor（随机森林回归）
+          - 超参数：n_estimators=350（350棵决策树）
+                          max_depth=7（每棵树最大深度7层，防止过拟合）
+                          min_samples_leaf=4（叶节点最少样本数）
+                          min_samples_split=5（内部节点分裂所需最小样本数）
+                          max_features="sqrt"（每棵树随机选择 sqrt(n_features) 个特征）
+                          random_state=42（固定随机种子，保证可重复性）
+                          n_jobs=-1（使用全部CPU核心并行训练）
+          - 预测值约束：np.clip(pred_y, min=0) 确保不会输出负销量
+
+        步骤⑤ 评估
+          - RMSE（均方根误差）：衡量预测偏差的幅度
+          - MAE（平均绝对误差）：直观的平均预测偏差
+          - MAPE（平均绝对百分比误差）：相对误差百分比
+          - R²（决定系数）：模型对数据的拟合程度
+
+        步骤⑥ 保存模型产物
+          - 将模型、特征列、训练日期范围、历史数据等 pickle 序列化到 Predictive/artifacts/
+          - 供后续 batch_predict() 和 get_dashboard() 直接加载使用
+        """
         try:
             scope = self._build_scope_context(supplier_id)
             dataset = self._build_training_dataset(scope.supplier_id)
@@ -73,19 +130,24 @@ class SalesForecastService:
                 return error("训练样本不足，无法完成模型训练")
 
             train_x, train_y, test_x, test_y, train_dates, test_dates = split_result
+            # 初始化随机森林回归模型（配置详见文档）
             model = RandomForestRegressor(
-                n_estimators=350,
-                max_depth=7,
-                min_samples_leaf=4,
-                min_samples_split=5,
-                max_features="sqrt",
-                random_state=42,
-                n_jobs=-1,
+                n_estimators=350,       # 350棵决策树，足够多的树保证稳定性
+                max_depth=7,            # 限制树深度，避免过拟合
+                min_samples_leaf=4,     # 叶节点最少4个样本
+                min_samples_split=5,    # 节点分裂最少5个样本
+                max_features="sqrt",    # 每棵树随机选取 sqrt(特征数) 个特征
+                random_state=42,        # 固定随机种子，保证结果可复现
+                n_jobs=-1,              # 启用全部 CPU 核心加速训练
             )
+            # 执行模型训练
             model.fit(train_x, train_y)
+            # 对测试集进行预测，并将负值截断为0
             pred_y = np.clip(model.predict(test_x), a_min=0.0, a_max=None)
+            # 计算模型评估指标
             metrics = self._build_metrics(test_y, pred_y)
 
+            # 构建完整的模型产物（包含模型、历史数据、特征列等）
             artifact = self._build_artifact(
                 scope=scope,
                 model=model,
@@ -95,7 +157,9 @@ class SalesForecastService:
                 test_dates=test_dates,
                 metrics=metrics,
             )
+            # 将模型产物序列化保存到磁盘
             self._save_artifact(scope, artifact)
+            # 清空内存预测缓存（模型更新后旧缓存失效）
             self._prediction_cache.clear()
             return success(self._build_training_response(artifact))
         except ValueError as exc:
@@ -313,7 +377,18 @@ class SalesForecastService:
         return calendar
 
     def _append_time_features(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """补充时间特征"""
+        """
+        补充时间特征（6个维度）
+
+        从 sale_date 日期字段提取以下特征：
+          - day_of_week  : 星期几（0=周一 ~ 6=周日），反映周内周期性
+          - day_of_month : 当月第几天（1~31），反映月初月末效应
+          - month        : 月份（1~12），反映季节性
+          - season       : 季节（1=春, 2=夏, 3=秋, 4=冬），反映季节效应
+          - is_weekend   : 是否周末（周六/日=1），周末消费行为差异
+          - is_holiday   : 是否节假日（匹配 CHINA_HOLIDAY_MMDD），节假日消费高峰
+          - promotion_strength: 促销强度（取商品折扣率和订单折扣率的最大值）
+        """
         frame["day_of_week"] = frame["sale_date"].dt.dayofweek
         frame["day_of_month"] = frame["sale_date"].dt.day
         frame["month"] = frame["sale_date"].dt.month
@@ -324,21 +399,56 @@ class SalesForecastService:
         return frame
 
     def _append_lag_features(self, frame: pd.DataFrame) -> pd.DataFrame:
-        """补充滞后特征（增强版）"""
+        """
+        补充滞后与滚动统计特征（共15个维度）
+
+        特征类别说明：
+        ─────────────────────────────────────────────────────────
+        ① 基础滞后特征（反映近期销量惯性）
+           lag_1  : 前1天销量 — 最近一天的销售表现，对次日预测影响最大
+           lag_3  : 前3天销量 — 短期趋势
+           lag_7  : 前7天销量 — 周同比，消除星期几效应
+           lag_14 : 前14天销量 — 双周同比
+
+        ② 滚动窗口统计（反映中短期趋势）
+           rolling_mean_3  : 近3天移动均值 — 短期平滑趋势
+           rolling_mean_7  : 近7天移动均值 — 周均线，消除日波动
+           rolling_mean_14 : 近14天移动均值 — 双周趋势
+           rolling_sum_14  : 近14天移动和值 — 半月销量合计
+           rolling_max_7   : 近7天最大值 — 近期峰值
+
+        ③ 周期特征
+           dow_avg : 星期几历史均值 — 如"周一平均卖50份"，捕捉周内固定模式
+                     对数据量不足7天的商品回退到商品整体均值
+
+        ④ 销售节奏特征
+           recent_sale_7d : 近7天是否有销量（0/1标记）
+           days_since_sale: 距上次销售天数（上限60天），反映商品冷热程度
+
+        ⑤ 品类辅助特征
+           cat_daily_avg  : 同品类商品当日日均销量，反映品类整体热度
+                            对数据稀疏的商品有重要的辅助参考价值
+
+        设计依据：
+            零售时间序列预测中，滞后特征（lag features）和滚动统计
+            （rolling statistics）是最有效的预测因子之一。本模型充分
+            利用日销售数据的时序结构，从多个时间尺度提取预测信号。
+        """
         groups = frame.groupby("product_id")["quantity"]
 
-        # 基础滞后特征
-        frame["lag_1"] = groups.shift(1)
-        frame["lag_3"] = groups.shift(3)
-        frame["lag_7"] = groups.shift(7)
-        frame["lag_14"] = groups.shift(14)
+        # ── ① 基础滞后特征（点状快照：取某一天的历史真实销量）──
+        frame["lag_1"] = groups.shift(1)    # 前1天 — 昨日销量，对次日预测影响最大
+        frame["lag_3"] = groups.shift(3)    # 前3天 — 短期趋势
+        frame["lag_7"] = groups.shift(7)    # 前7天 — 周同比，消除星期几效应
+        frame["lag_14"] = groups.shift(14)  # 前14天 — 双周同比
 
-        # 滚动窗口特征
-        frame["rolling_mean_3"] = groups.shift(1).rolling(3).mean().reset_index(level=0, drop=True)
-        frame["rolling_mean_7"] = groups.shift(1).rolling(7).mean().reset_index(level=0, drop=True)
-        frame["rolling_mean_14"] = groups.shift(1).rolling(14).mean().reset_index(level=0, drop=True)
-        frame["rolling_sum_14"] = groups.shift(1).rolling(14).sum().reset_index(level=0, drop=True)
-        frame["rolling_max_7"] = groups.shift(1).rolling(7).max().reset_index(level=0, drop=True)
+        # ── ② 滚动窗口特征（区间聚合：平滑日间噪音，暴露中短期走向）──
+        # 注：shift(1) 排除当天数据，防止数据泄露
+        frame["rolling_mean_3"] = groups.shift(1).rolling(3).mean().reset_index(level=0, drop=True)   # 近3天均值 — 短期平滑趋势
+        frame["rolling_mean_7"] = groups.shift(1).rolling(7).mean().reset_index(level=0, drop=True)   # 近7天均值 — 周均线
+        frame["rolling_mean_14"] = groups.shift(1).rolling(14).mean().reset_index(level=0, drop=True) # 近14天均值 — 双周趋势
+        frame["rolling_sum_14"] = groups.shift(1).rolling(14).sum().reset_index(level=0, drop=True)   # 近14天和值 — 半月销量合计
+        frame["rolling_max_7"] = groups.shift(1).rolling(7).max().reset_index(level=0, drop=True)     # 近7天最大值 — 近期峰值
 
         # 星期几历史均值（捕捉周期性），使用 transform 避免 apply 索引对齐问题
         frame["dow_avg"] = frame.groupby(["product_id", "day_of_week"])["quantity"].transform("mean")
@@ -380,7 +490,24 @@ class SalesForecastService:
         dataset: pd.DataFrame,
         test_days: int,
     ) -> Optional[Tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series, List[str], List[str]]]:
-        """按时间划分训练集与测试集"""
+        """
+        按时间顺序划分训练集与测试集
+
+        划分策略：
+          - 将数据集按日期升序排列，取最后 test_days 天作为测试集
+          - 之前的数据全部作为训练集
+          - 最小训练天数要求：至少 5 个不同的日期
+          - 测试集天数自适应：如果总天数太少，test_days 自动缩小
+            为总天数的 1/3（最少保留 1 天测试、2 天训练）
+
+        为什么用时间切分而不是随机切分？
+            时间序列数据存在自相关性，随机切分会导致未来信息泄露
+            （用明天的数据训练去预测今天），使评估结果虚高。
+            按时间切分模拟真实的预测场景，评估结果更可靠。
+
+        返回：
+          (train_x, train_y, test_x, test_y, train_dates, test_dates)
+        """
         dates = sorted(dataset["sale_date"].dt.strftime("%Y-%m-%d").unique().tolist())
         if len(dates) < 5:
             return None
@@ -406,7 +533,28 @@ class SalesForecastService:
         )
 
     def _build_metrics(self, actual: pd.Series, pred: np.ndarray) -> Dict[str, float]:
-        """构建评估指标"""
+        """
+        计算模型评估指标（4项）
+
+        RMSE（均方根误差）：
+            sqrt(mean((actual - pred)^2))
+            对大误差敏感，衡量预测偏差的总体幅度。值越小越好。
+            单位：销量件数。
+
+        MAE（平均绝对误差）：
+            mean(|actual - pred|)
+            直观的平均偏差。比如 MAE=2.5 表示平均每天偏差 2.5 件。
+
+        MAPE（平均绝对百分比误差）：
+            mean(|(actual - pred) / actual|) * 100
+            相对误差百分比。当 actual=0 时，分母替换为 1 避免除零。
+            用于在不同量级的商品间横向比较。
+
+        R²（决定系数）：
+            1 - SS_res / SS_tot
+            模型解释了多少比例的方差。1=完美拟合，0=跟均值预测一样，
+            负数=不如简单取均值。
+        """
         actual_values = actual.to_numpy(dtype=float)
         rmse = float(np.sqrt(mean_squared_error(actual_values, pred)))
         mae = float(mean_absolute_error(actual_values, pred))
@@ -490,7 +638,20 @@ class SalesForecastService:
         forecast_days: int,
         test_days: int,
     ) -> Any:
-        """加载或训练模型产物"""
+        """
+        加载或重新训练模型
+
+        判断逻辑：
+          ① 模型文件不存在 → 立即训练
+          ② 模型文件损坏（pickle反序列化失败） → 重新训练
+          ③ 特征列发生变化（代码升级新增/删减了特征） → 重新训练
+             （旧模型的特征维度与新数据不匹配，必须重新训练）
+          ④ 以上均无问题 → 直接加载已保存的模型
+
+        模型文件路径规则：
+          - 全平台：Predictive/artifacts/platform_sales_forecast.pkl
+          - 指定团长：Predictive/artifacts/supplier_{id}_sales_forecast.pkl
+        """
         path = self._artifact_path(supplier_id)
         if not os.path.exists(path):
             train_result = self.train_model(supplier_id, forecast_days, test_days)
@@ -559,7 +720,30 @@ class SalesForecastService:
         return os.path.join(ARTIFACT_DIR, f"pred_{safe_key}.pkl")
 
     def _forecast_future(self, artifact: Dict[str, Any], forecast_days: int) -> pd.DataFrame:
-        """递归预测未来销量（全量批量预测优化版）"""
+        """
+        递归预测未来 N 天销量
+
+        核心策略（递归预测）：
+        ─────────────────────────────────────────────────────────
+        由于销量预测是时间序列任务，预测未来第 N 天时需要用到
+        前 N-1 天的数据作为滞后特征。但未来第 N 天的真实销量未知，
+        因此采用"递归预测"策略：
+
+        第1步：用历史最后一天的 lag_1、lag_3、…… 预测第1天
+        第2步：将第1天的预测值拼接到历史数据末尾
+        第3步：用拼接后的数据（含预测值）的 lag_1、lag_3、……预测第2天
+        第4步：重复以上步骤，直到预测完 forecast_days 天
+
+        优化措施：
+          - 全量商品批量预测：所有商品同一阶段的特征放在一个 DataFrame 中，
+            一次 model.predict() 完成所有商品的预测，利用向量化加速
+          - 桥上日期补齐：如果历史数据结束日 < 预测起始日，自动填充中间
+            的日期（bridge_dates），保证滞后特征的连续性
+
+        局限：
+          递归预测会累积误差 —— 预测的天数越多，准确率逐步下降。
+          本系统默认预测 7 天，在此范围内累积误差可以接受。
+        """
         model: RandomForestRegressor = artifact["model"]
         history = artifact["history"].copy()
         history["sale_date"] = pd.to_datetime(history["sale_date"])
@@ -662,10 +846,12 @@ class SalesForecastService:
             "is_weekend": int(dow in [5, 6]),
             "is_holiday": int(future_date.strftime("%m-%d") in CHINA_HOLIDAY_MMDD),
             "promotion_strength": float(base_row["discount_rate"]),
-            "lag_1": float(quantity_series.iloc[-1]),
+            # ① 基础滞后特征：从已观测/已预测序列中取对应位置的值
+            "lag_1": float(quantity_series.iloc[-1]),     # 最近一天的预测/真实销量
             "lag_3": float(quantity_series.iloc[-3]) if len(quantity_series) >= 3 else float(quantity_series.mean()),
             "lag_7": float(quantity_series.iloc[-7]) if len(quantity_series) >= 7 else float(quantity_series.mean()),
             "lag_14": float(quantity_series.iloc[-14]) if len(quantity_series) >= 14 else float(quantity_series.mean()),
+            # ② 滚动窗口统计：从尾部取窗口做聚合（递归预测时，窗口包含之前步的预测值）
             "rolling_mean_3": float(quantity_series.tail(3).mean()),
             "rolling_mean_7": float(quantity_series.tail(7).mean()),
             "rolling_mean_14": float(quantity_series.tail(14).mean()),
@@ -717,11 +903,38 @@ class SalesForecastService:
         }
 
     def _build_safety_stock(self, forecast_quantity: float) -> int:
-        """计算安全库存"""
+        """
+        计算安全库存
+
+        计算公式：安全库存 = ceil(预测销量 × 安全系数)
+        安全系数 SAFETY_STOCK_RATE = 0.15（15%）
+
+        用途：安全库存用于应对实际需求超出预测的不确定性。
+        例如预测未来7天卖100件，安全库存 = ceil(100×0.15) = 15件，
+        则目标库存 = 100 + 15 = 115件。
+        """
         return int(np.ceil(int(forecast_quantity) * SAFETY_STOCK_RATE))
 
     def _build_purchase_advice(self, row: pd.Series) -> Dict[str, Any]:
-        """生成采购建议"""
+        """
+        生成采购建议
+
+        核心逻辑：
+          目标库存 = 预测销量 + 安全库存
+          建议采购量 = max(目标库存 - 当前库存, 0)
+          库存缺口   = max(预测销量 - 当前库存, 0)
+
+        示例：
+          预测未来7天销量 = 100件，安全库存 = 15件
+          当前库存 = 30件
+          目标库存 = 115件
+          建议采购量 = max(115 - 30, 0) = 85件
+
+        风险等级判定（_get_stock_risk_level）：
+          low    : 当前库存 >= 目标库存，无需补货
+          medium : 当前库存 >= 目标库存的50%，建议关注
+          high   : 当前库存 < 目标库存的50%，急需补货
+        """
         forecast_quantity = int(round(row["predicted_quantity"]))
         stock = int(row["stock"])
         safety_stock = self._build_safety_stock(forecast_quantity)
@@ -848,7 +1061,25 @@ class SalesForecastService:
         return {"start": dates[0], "end": dates[-1], "days": len(dates)}
 
     def _get_feature_columns(self) -> List[str]:
-        """获取特征列"""
+        """
+        获取全部特征列（共30维）
+
+        特征分类：
+          - 商品基础（5维）：product_id, supplier_id, category_id, price, stock
+          - 商品标签（3维）：is_hot, is_new, discount_rate
+          - 时间特征（7维）：day_of_week, day_of_month, month, season,
+                     is_weekend, is_holiday, has_promotion
+          - 促销特征（2维）：order_discount_rate, promotion_strength
+          - 滞后特征（4维）：lag_1, lag_3, lag_7, lag_14
+          - 滚动统计（5维）：rolling_mean_3, rolling_mean_7, rolling_mean_14,
+                     rolling_sum_14, rolling_max_7
+          - 周期特征（1维）：dow_avg
+          - 节奏特征（2维）：recent_sale_7d, days_since_sale
+          - 品类特征（1维）：cat_daily_avg
+
+        注意：特征必须保持顺序稳定，因为已训练模型内部记录了
+        训练时的特征顺序，预测时必须使用完全相同的顺序。
+        """
         return [
             "product_id",
             "supplier_id",
@@ -867,10 +1098,12 @@ class SalesForecastService:
             "has_promotion",
             "order_discount_rate",
             "promotion_strength",
+            # ① 基础滞后特征
             "lag_1",
             "lag_3",
             "lag_7",
             "lag_14",
+            # ② 滚动窗口统计
             "rolling_mean_3",
             "rolling_mean_7",
             "rolling_mean_14",

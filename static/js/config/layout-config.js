@@ -219,7 +219,6 @@ const LayoutConfig = {
         },
         platform_operator: {
             '运营中台': ['operator-orders', 'operator-data', 'operator-sales-forecast'],
-            '数据分析': ['visual-analysis'],
             '服务管理': ['complaints', 'announcements'],
             '个人设置': ['profile']
         },

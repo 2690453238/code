@@ -93,8 +93,8 @@
                     <el-col :xs="24" :sm="12" :lg="6">
                         <el-card class="kpi-card">
                             <div class="kpi-box">
-                                <div class="kpi-title">MAPE</div>
-                                <div class="kpi-value">{{ dashboard.metrics.mape || 0 }}%</div>
+                                <div class="kpi-title">MAE</div>
+                                <div class="kpi-value">{{ dashboard.metrics.mae || 0 }}</div>
                                 <div class="kpi-desc">模型误差越低越好</div>
                             </div>
                         </el-card>
@@ -140,9 +140,9 @@
                             </div>
                         </div>
                         <div class="explain-block">
-                            <div class="explain-title">MAPE</div>
+                            <div class="explain-title">MAE</div>
                             <div class="explain-text">
-                                平均绝对百分比误差，越低表示预测越接近实际销量。
+                                平均绝对误差（件），越低表示预测越接近实际销量。
                             </div>
                         </div>
                         <div class="explain-block">

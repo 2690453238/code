@@ -562,7 +562,7 @@
                         <h1 class="product-title">{{ product.name }}</h1>
                         
                         <div class="product-price">
-                            ¥{{ product.discountRate ? (product.price * product.discountRate).toFixed(2) : product.price }}
+                            ¥{{ product.discountRate ? (Number(product.price) * product.discountRate).toFixed(2) : Number(product.price).toFixed(2) }}
                             <span v-if="product.discountRate" class="discount-tag">
                                 {{ Math.round(product.discountRate * 10) }}折
                             </span>

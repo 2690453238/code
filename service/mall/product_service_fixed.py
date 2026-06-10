@@ -44,6 +44,7 @@ class ProductService(BaseProductService):
             if supplier_id is None else self._get_products_scoped(category_id, status, page, limit, keyword, sort_type, supplier_id)
 
     def _get_products_scoped(self, category_id, status, page, limit, keyword, sort_type, supplier_id):
+        self._ensure_db()
         result = self.product_model.get_products(category_id, status, page, limit, keyword, sort_type, supplier_id)
         from utils.response import page_response
         return page_response(result['rows'], result['total'], result['page'], result['limit'])
@@ -54,6 +55,7 @@ class ProductService(BaseProductService):
             if supplier_id is None else self._get_hot_scoped(limit, supplier_id)
 
     def _get_hot_scoped(self, limit: int, supplier_id: int) -> Dict:
+        self._ensure_db()
         result = self.product_model.get_products(status=1, limit=limit, supplier_id=supplier_id)
         hot_products = [p for p in result['rows'] if p.get('isHot') == 1]
         from utils.response import success
@@ -65,6 +67,7 @@ class ProductService(BaseProductService):
             if supplier_id is None else self._get_new_scoped(limit, supplier_id)
 
     def _get_new_scoped(self, limit: int, supplier_id: int) -> Dict:
+        self._ensure_db()
         result = self.product_model.get_products(status=1, limit=limit, supplier_id=supplier_id)
         new_products = [p for p in result['rows'] if p.get('isNew') == 1]
         from utils.response import success
@@ -177,6 +180,7 @@ class ProductService(BaseProductService):
     def update_product(self, product_id: int, product_data: Dict, user_info: Optional[Dict] = None) -> Dict:
         from utils.response import success, error
         try:
+            self._ensure_db()
             supplier_id = self._get_supplier_scope_id(user_info)
             result = self.product_model.update_product(product_id, product_data, supplier_id)
             if result:
@@ -188,6 +192,7 @@ class ProductService(BaseProductService):
     def delete_product(self, product_id: int, user_info: Optional[Dict] = None) -> Dict:
         from utils.response import success, error
         try:
+            self._ensure_db()
             supplier_id = self._get_supplier_scope_id(user_info)
             result = self.product_model.delete_product(product_id, supplier_id)
             if result:
@@ -199,6 +204,7 @@ class ProductService(BaseProductService):
     def update_product_status(self, product_id: int, status: int, user_info: Optional[Dict] = None) -> Dict:
         from utils.response import success, error
         try:
+            self._ensure_db()
             supplier_id = self._get_supplier_scope_id(user_info)
             result = self.product_model.update_product_status(product_id, status, supplier_id)
             if result:
@@ -211,6 +217,7 @@ class ProductService(BaseProductService):
     def batch_delete_products(self, product_ids: List[int], user_info: Optional[Dict] = None) -> Dict:
         from utils.response import success, error
         try:
+            self._ensure_db()
             supplier_id = self._get_supplier_scope_id(user_info)
             result = self.product_model.batch_delete_products(product_ids, supplier_id)
             if result:

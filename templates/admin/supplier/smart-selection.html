@@ -51,7 +51,7 @@
 
                 <!-- 数据概览 -->
                 <div class="summary-row">
-                    <div class="summary-card"><div class="num" style="color:#2563eb">{{ dashboard.newProductCount || 0 }}</div><div class="lbl">待选新品</div></div>
+                    <div class="summary-card"><div class="num" style="color:#2563eb">{{ dashboard.newProductCount || 0 }}</div><div class="lbl">推荐商品</div></div>
                     <div class="summary-card"><div class="num" style="color:#dc2626">{{ dashboard.slowHighCount || 0 }}<small style="font-size:14px;color:#94a3b8">/{{ dashboard.slowMovingCount || 0 }}</small></div><div class="lbl">滞销商品 <small style="color:#94a3b8">高危/总计</small></div></div>
                     <div class="summary-card"><div class="num" style="color:#d97706">{{ dashboard.urgentRestockCount || 0 }}</div><div class="lbl">待补货</div></div>
                     <div class="summary-card"><div class="num" style="color:#059669">{{ dashboard.seasonalCount || 0 }}</div><div class="lbl">应季推荐</div></div>
@@ -60,11 +60,11 @@
 
                 <!-- Tabs -->
                 <el-tabs v-model="activeTab" @tab-click="onTabChange" style="background:#fff;border-radius:12px;padding:0 4px;box-shadow:0 1px 3px rgba(0,0,0,.06);">
-                        <el-tab-pane label="新品推荐" name="newProducts">
+                        <el-tab-pane label="商品推荐" name="newProducts">
                             <div class="tab-content">
                                 <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between">
                                     <span style="font-size:13px;color:#64748b">
-                                        勾选需要采购的商品，推荐分 &ge; 80 已自动预选
+                                        以下商品按推荐分从高到低排序，有预测数据的已自动预选
                                     </span>
                                     <el-button type="primary" size="small"
                                         :loading="purchasing"
@@ -74,7 +74,28 @@
                                 </div>
                                 <el-table ref="newProductsTable" :data="newProducts" stripe size="small" v-loading="loading.newProducts" @selection-change="onNewProductSelectionChange">
                                     <el-table-column type="selection" width="50"></el-table-column>
-                                    <el-table-column prop="productName" label="商品名称" min-width="200">
+                                    <el-table-column label="推荐分" width="90" align="center" sortable prop="recommendationScore">
+                                        <template slot-scope="s">
+                                            <el-tooltip placement="top" width="200" effect="dark">
+                                                <div slot="content">
+                                                    <div style="font-size:12px;line-height:1.8">
+                                                        <div>预测销量: {{ s.row.scoreDetails.forecastScore || 0 }}分</div>
+                                                        <div>历史销量: {{ s.row.scoreDetails.salesScore || 0 }}分</div>
+                                                        <div>库存健康: {{ s.row.scoreDetails.stockScore || 0 }}分</div>
+                                                        <div>价格系数: {{ s.row.scoreDetails.priceScore || 0 }}分</div>
+                                                        <div>热度加分: {{ s.row.scoreDetails.hotScore || 0 }}分</div>
+                                                        <div style="border-top:1px solid rgba(255,255,255,.2);margin-top:4px;padding-top:4px;font-weight:600">总分: {{ s.row.recommendationScore }}分</div>
+                                                    </div>
+                                                </div>
+                                                <el-progress :percentage="s.row.recommendationScore" :width="32" type="circle" :stroke-width="6"
+                                                    :color="s.row.recommendationScore >= 70 ? '#67c23a' : s.row.recommendationScore >= 40 ? '#e6a23c' : '#f56c6c'"
+                                                    :show-text="false">
+                                                </el-progress>
+                                                <span style="margin-left:4px;font-size:12px;font-weight:600;color:#475569">{{ s.row.recommendationScore }}</span>
+                                            </el-tooltip>
+                                        </template>
+                                    </el-table-column>
+                                    <el-table-column prop="productName" label="商品名称" min-width="180">
                                         <template slot-scope="s">
                                             <div style="display:flex;align-items:center;gap:10px">
                                                 <img :src="s.row.mainImage" style="width:40px;height:40px;border-radius:6px;object-fit:cover;background:#f1f5f9" @error="onImgError">
@@ -82,22 +103,14 @@
                                             </div>
                                         </template>
                                     </el-table-column>
-                                    <el-table-column prop="categoryName" label="品类" width="100"></el-table-column>
-                                    <el-table-column prop="sales" label="总销量" width="90" align="right"></el-table-column>
-                                    <el-table-column prop="browseCount" label="近期热度" width="90" align="right"></el-table-column>
-                                    <el-table-column prop="score" label="推荐分" width="100" align="center">
-                                        <template slot-scope="s">
-                                            <el-tag :type="s.row.score >= 80 ? 'success' : s.row.score >= 60 ? 'warning' : 'danger'" size="mini" effect="dark" style="border:0">
-                                                {{ s.row.score >= 80 ? '推荐购买' : s.row.score >= 60 ? '一般' : '不推荐' }}
-                                            </el-tag>
-                                        </template>
-                                    </el-table-column>
-                                    <el-table-column prop="forecastQuantity" label="预测销量" width="90" align="right">
+                                    <el-table-column prop="sales" label="总销量" width="80" align="right"></el-table-column>
+                                    <el-table-column prop="forecastQuantity" label="预测销量" width="80" align="right">
                                         <template slot-scope="s">
                                             <span v-if="s.row.forecastQuantity > 0" style="color:#059669;font-weight:600">{{ s.row.forecastQuantity }}</span>
                                             <span v-else style="color:#94a3b8">-</span>
                                         </template>
                                     </el-table-column>
+                                    <el-table-column prop="stock" label="库存" width="70" align="right"></el-table-column>
                                     <el-table-column label="推荐购入" width="110" align="center">
                                         <template slot-scope="s">
                                             <el-input-number v-model="s.row.purchaseQuantity"
@@ -107,18 +120,14 @@
                                             </el-input-number>
                                         </template>
                                     </el-table-column>
-                                    <el-table-column prop="price" label="价格" width="90" align="right">
+                                    <el-table-column prop="price" label="价格" width="80" align="right">
                                         <template slot-scope="s">¥{{ s.row.price }}</template>
                                     </el-table-column>
-                                    <el-table-column prop="reason" label="推荐理由" min-width="140">
-                                        <template slot-scope="s">
-                                            <el-tag v-for="r in s.row.reason.split('、')" :key="r" size="mini" style="margin-right:4px">{{ r }}</el-tag>
-                                        </template>
-                                    </el-table-column>
+                                    <el-table-column prop="categoryName" label="品类" width="80"></el-table-column>
                                 </el-table>
                                 <div v-if="newProducts.length === 0 && !loading.newProducts" class="empty-state">
                                     <i class="el-icon-goods"></i>
-                                    <p>暂无新品推荐</p>
+                                    <p>暂无商品推荐</p>
                                 </div>
                             </div>
                         </el-tab-pane>
@@ -146,7 +155,7 @@
                                     <el-table-column label="风险等级" width="100" align="center">
                                         <template slot-scope="s">
                                             <el-tag :type="s.row.tagType" size="mini" effect="dark">
-                                                {{ s.row.riskLevel === 'high' ? '高风险' : s.row.riskLevel === 'medium' ? '中风险' : '正常' }}
+                                                {{ s.row.riskLevel === 'high' ? '高风险' : s.row.riskLevel === 'medium' ? '中风险' : s.row.riskLevel === 'low' ? '低风险' : '正常' }}
                                             </el-tag>
                                         </template>
                                     </el-table-column>
@@ -359,10 +368,12 @@ new Vue({
                             });
                         }
                         self[dataKey[tabName]] = items;
-                        self.selectedProductIds = [];
-                        self.$nextTick(function () {
-                            if (tabName === 'newProducts') self.preselectNewProducts(items);
-                        });
+                        if (tabName === 'newProducts') {
+                            self.selectedProductIds = [];
+                            self.$nextTick(function () {
+                                self.preselectNewProducts(items);
+                            });
+                        }
                     }
                 })
                 .catch(function () {
@@ -428,10 +439,15 @@ new Vue({
         preselectNewProducts: function (items) {
             var self = this;
             if (!self.$refs.newProductsTable) return;
+            var selected = [];
             items.forEach(function (item) {
-                if (item.score >= 80) {
+                if (item.recommendationScore >= 60) {
                     self.$refs.newProductsTable.toggleRowSelection(item, true);
+                    selected.push(item.productId);
                 }
+            });
+            self.$nextTick(function () {
+                self.selectedProductIds = selected;
             });
         },
         batchPurchase: function () {

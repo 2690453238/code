@@ -141,7 +141,6 @@ Vue.component('theme-preview', {
         </div>
     `,
     methods: {
-        ...Vue.component('theme-preview').methods,
         getThemeColor(colorKey) {
             // 这里可以根据主题配置返回对应的颜色
             const colorMap = {
