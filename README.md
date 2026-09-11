@@ -597,7 +597,6 @@ POST /api/analytics/forecast/sales/train?forecastDays=7&testDays=14
 
 - 本项目为**毕业设计作品**，仓库内的商品、用户、订单等数据由 `insert_historical_data.py` 与 `scripts/*.py` **脚本模拟生成**，仅用于功能演示与算法验证，不涉及任何真实用户信息。
 - 论文题目：《基于 Python 的社区团购智能选品与销量预测系统的设计与实现》
-- 学校：武昌首义学院 ｜ 作者：<请填写姓名> ｜ 指导教师：<请填写教师姓名>
 
 ## License
 
